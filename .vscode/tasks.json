@@ -13,6 +13,14 @@
             "problemMatcher": []
         },
         {
+            "label": "Generate PNG Assets",
+            "type": "shell",
+            "command": "make",
+            "args": ["generate"],
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
             "label": "Convert PNG Assets",
             "type": "shell",
             "command": "make",

@@ -16,6 +16,8 @@ endif
 LCC         = $(GBDK_HOME)/bin/lcc
 PNG2ASSET   = $(GBDK_HOME)/bin/png2asset
 
+PYTHON3     = python3
+
 PROJECTNAME = GBCTemplate
 SRCDIR      = src
 OBJDIR      = obj
@@ -35,9 +37,14 @@ OBJS        = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCSRC)) \
 
 PNG_ASSETS  = $(RESDIR)/background.png $(RESDIR)/font.png $(RESDIR)/sprite.png
 
-.PHONY: all convert clean
+.PHONY: all generate convert clean
 
 all: prepare $(BINS)
+
+# Generate PNG assets + C/H source files using Python scripts (no GBDK needed).
+# Requires: pip install pillow
+generate:
+	$(PYTHON3) tools/generate_assets.py
 
 convert:
 	$(PNG2ASSET) $(RESDIR)/background.png -c $(RESDIR)/background.c -map -bpp 2 -max_palettes 2

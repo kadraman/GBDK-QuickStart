@@ -24,7 +24,7 @@ A complete starter template for **GameBoy Color (GBC)** games, built with [GBDK-
 |---|---|---|
 | **GBDK-2020** | Compiler & linker (`lcc`) | https://github.com/gbdk-2020/gbdk-2020/releases |
 | **Emulicious** | Emulator for testing | https://emulicious.net |
-| **Python 3 + Pillow** | Asset regeneration script | `pip install pillow` |
+| **Python 3 + Pillow** | `make generate` (regenerate PNG/C/H assets) | `pip install pillow` |
 
 Install GBDK-2020 to `~/gbdk/` (default), or set the `GBDK_HOME` environment variable:
 
@@ -44,17 +44,24 @@ GBC-Template/
 │   ├── state_machine.c     # switch_state() / run_current_state() implementation
 │   ├── state_title.c/.h    # Title screen state
 │   ├── state_gameplay.c/.h # Gameplay state (d-pad movement, animation)
-│   └── state_gameover.c/.h # Game over state
+│   ├── state_gameover.c/.h # Game over state
+│   └── utils.c/.h          # Shared draw_text() helper
 ├── res/
-│   ├── background.png      # 160×144 indexed PNG (4-color sky/cloud/grass/ground)
+│   ├── background.png      # 160×144 indexed PNG (sky/cloud/grass/ground)
 │   ├── font.png            # 128×48 indexed PNG (96 chars, ASCII 32–127)
-│   ├── sprite.png          # 32×64 indexed PNG (8 animation frames, 16×16 each)
+│   ├── sprite.png          # 8×64 indexed PNG (4 animation frames of 8×16)
 │   ├── background.c/.h     # Pre-generated 2bpp tile data + GBC palettes + tilemap
 │   ├── font.c/.h           # Pre-generated 2bpp font tile data
 │   └── sprite.c/.h         # Pre-generated 2bpp sprite tile data + GBC palette
+├── tools/
+│   ├── gbc_asset_builder.py  # Reusable library: 2bpp conversion, .c/.h writers
+│   ├── gen_background.py     # Generates res/background.{png,c,h}
+│   ├── gen_font.py           # Generates res/font.{png,c,h}
+│   ├── gen_sprite.py         # Generates res/sprite.{png,c,h}
+│   └── generate_assets.py    # Master script: runs all three generators
 ├── .vscode/
 │   ├── c_cpp_properties.json  # IntelliSense paths for GBDK headers
-│   ├── tasks.json             # Build / convert / clean tasks
+│   ├── tasks.json             # Build / generate / convert / clean tasks
 │   └── extensions.json        # Recommended VS Code extensions
 ├── Makefile                # Build system
 └── README.md
@@ -77,15 +84,33 @@ make all
 Emulicious obj/GBCTemplate.gbc
 ```
 
-### 3. Regenerate assets from PNG (optional)
+### 3. Regenerate assets from Python (no GBDK needed)
 
-If you edit the PNG files, regenerate the C/H files using `png2asset` via the Makefile:
+If you edit the PNG files or the Python generator scripts, regenerate all C/H
+source files and PNGs with:
+
+```bash
+make generate
+# or: python3 tools/generate_assets.py
+```
+
+Individual generators can also be run separately:
+
+```bash
+python3 tools/gen_background.py
+python3 tools/gen_font.py
+python3 tools/gen_sprite.py
+```
+
+### 4. Regenerate assets from PNG using png2asset (optional)
+
+If you have GBDK-2020 installed and prefer `png2asset` for your workflow:
 
 ```bash
 make convert
 ```
 
-### 4. Clean build artifacts
+### 5. Clean build artifacts
 
 ```bash
 make clean
@@ -147,6 +172,40 @@ To add a new state:
 1. Add a new entry to `GameStateID` in `states.h`
 2. Create `state_newstate.c/.h` implementing `init`, `update`, `cleanup`
 3. Add `&state_newstate` to the `states[]` array in `state_machine.c`
+
+---
+
+## Asset Generation Tools
+
+The `tools/` directory contains Python scripts (requires `pip install pillow`) for
+generating all PNG and C/H source files from scratch.  No GBDK installation is needed.
+
+### `gbc_asset_builder.py` — reusable library
+
+| Function | Description |
+|---|---|
+| `pixels_to_2bpp(rows_8x8)` | Convert 8×8 pixel tile to 16 GBDK 2bpp bytes |
+| `tiles_to_2bpp_bytes(tiles)` | Flatten a list of tiles to a byte list |
+| `png_to_tiles(png_path)` | Load indexed PNG and extract 8×8 tile pixel data |
+| `make_indexed_png(grid, palette, path)` | Create indexed PNG from pixel array |
+| `write_background_files(...)` | Write background `.c` + `.h` from tile/map/palette data |
+| `write_font_files(...)` | Write font `.c` + `.h` from tile/palette data |
+| `write_sprite_files(...)` | Write sprite `.c` + `.h` for 8×16 sprite mode |
+
+### Creating your own example
+
+1. **New background** – copy `tools/gen_background.py`, edit `TILES`, `TILEMAP`,
+   and `PALETTE_COLORS`, then run it.  The output goes to `res/` by default; change
+   `out_dir` in `main()` to target a different directory.
+
+2. **New font** – copy `tools/gen_font.py`, edit `FONT_BITMAPS` (one 8-byte row
+   bitmap per ASCII character), adjust `PALETTE_COLORS`.
+
+3. **New sprite** – copy `tools/gen_sprite.py`, edit `FRAMES_TOP` / `FRAMES_BOTTOM`
+   (8×8 pixel arrays using the colour aliases `T Y B D`), adjust `PALETTE_COLORS`.
+
+4. Import `gbc_asset_builder` in your own script to reuse the 2bpp conversion and
+   file-writing helpers for any custom asset type.
 
 ---
 
