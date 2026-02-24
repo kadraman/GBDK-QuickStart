@@ -1,0 +1,16 @@
+#ifndef BACKGROUND_H
+#define BACKGROUND_H
+
+#include <gb/gb.h>
+#include <stdint.h>
+
+#define BACKGROUND_TILE_COUNT    15U
+#define BACKGROUND_PALETTE_COUNT 2U
+#define BACKGROUND_MAP_WIDTH     20U
+#define BACKGROUND_MAP_HEIGHT    18U
+
+extern const palette_color_t background_palettes[8];
+extern const uint8_t background_tiles[240];
+extern const uint8_t background_map[360];
+
+#endif

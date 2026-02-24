@@ -1,0 +1,39 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build GBC ROM",
+            "type": "shell",
+            "command": "make",
+            "args": ["all"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Convert PNG Assets",
+            "type": "shell",
+            "command": "make",
+            "args": ["convert"],
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Clean Build",
+            "type": "shell",
+            "command": "make",
+            "args": ["clean"],
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Build and Run in Emulicious",
+            "type": "shell",
+            "command": "make all && Emulicious obj/GBCTemplate.gbc",
+            "group": "build",
+            "problemMatcher": []
+        }
+    ]
+}

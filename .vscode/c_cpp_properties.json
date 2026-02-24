@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "GBDK",
+            "includePath": [
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/res",
+                "${env:HOME}/gbdk/include",
+                "${env:GBDK_HOME}/include"
+            ],
+            "defines": [
+                "__PORT_sm83",
+                "__TARGET_gb",
+                "__GBC__"
+            ],
+            "compilerPath": "${env:HOME}/gbdk/bin/sdcc",
+            "cStandard": "c99",
+            "intelliSenseMode": "gcc-x86"
+        }
+    ],
+    "version": 4
+}
