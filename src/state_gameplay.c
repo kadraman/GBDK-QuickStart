@@ -12,8 +12,6 @@ static uint8_t sprite_y;
 /* Animation */
 static uint8_t anim_counter;
 static uint8_t anim_frame;
-/* Pause flag */
-static uint8_t paused;
 static uint8_t prev_joy;
 
 static void gameplay_init(void) {
@@ -22,7 +20,6 @@ static void gameplay_init(void) {
     sprite_y = 72;
     anim_counter = 0;
     anim_frame = 0;
-    paused = 0;
     prev_joy = 0;
 
     /* Draw background tilemap */
@@ -56,28 +53,26 @@ static void gameplay_update(void) {
     uint8_t joy = joypad();
     uint8_t joy_pressed = joy & ~prev_joy;
 
-    if (!paused) {
-        /* Move sprite with d-pad */
-        if (joy & J_RIGHT && sprite_x < 152U) sprite_x++;
-        if (joy & J_LEFT  && sprite_x > 8U)   sprite_x--;
-        if (joy & J_DOWN  && sprite_y < 128U)  sprite_y++;
-        if (joy & J_UP    && sprite_y > 16U)   sprite_y--;
+    /* Move sprite with d-pad */
+    if (joy & J_RIGHT && sprite_x < 152U) sprite_x++;
+    if (joy & J_LEFT  && sprite_x > 8U)   sprite_x--;
+    if (joy & J_DOWN  && sprite_y < 128U)  sprite_y++;
+    if (joy & J_UP    && sprite_y > 16U)   sprite_y--;
 
-        /* Animate sprite */
-        anim_counter++;
-        if (anim_counter >= 10U) {
-            anim_counter = 0;
-            anim_frame = (uint8_t)((anim_frame + 1U) % SPRITE_FRAME_COUNT);
-            set_sprite_tile(0, (uint8_t)(anim_frame * SPRITE_TILES_PER_FRAME));
-            set_sprite_tile(1, (uint8_t)(anim_frame * SPRITE_TILES_PER_FRAME + 2U));
-        }
-
-        /* Update sprite position */
-        move_sprite(0, sprite_x, sprite_y);
-        move_sprite(1, sprite_x, (uint8_t)(sprite_y + 16U));
+    /* Animate sprite */
+    anim_counter++;
+    if (anim_counter >= 10U) {
+        anim_counter = 0;
+        anim_frame = (uint8_t)((anim_frame + 1U) % SPRITE_FRAME_COUNT);
+        set_sprite_tile(0, (uint8_t)(anim_frame * SPRITE_TILES_PER_FRAME));
+        set_sprite_tile(1, (uint8_t)(anim_frame * SPRITE_TILES_PER_FRAME + 2U));
     }
 
-    /* Toggle pause or go to game over on START */
+    /* Update sprite position */
+    move_sprite(0, sprite_x, sprite_y);
+    move_sprite(1, sprite_x, (uint8_t)(sprite_y + 16U));
+
+    /* Go to game over on START */
     if (joy_pressed & J_START) {
         switch_state(STATE_GAME_OVER);
     }
