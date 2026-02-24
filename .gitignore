@@ -64,3 +64,8 @@ obj/
 *.noi
 *.map
 *.sym
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
