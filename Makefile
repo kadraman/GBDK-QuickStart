@@ -3,6 +3,12 @@
 # Builds a GameBoy Color ROM using GBDK-2020
 #
 
+# Clear environment variables that can interfere with the GBDK toolchain on Windows
+INCLUDE :=
+LIB :=
+CPATH :=
+export INCLUDE LIB CPATH
+
 ifndef GBDK_HOME
     GBDK_HOME = $(HOME)/gbdk
 endif
@@ -36,7 +42,7 @@ all: prepare $(BINS)
 convert:
 	$(PNG2ASSET) $(RESDIR)/background.png -c $(RESDIR)/background.c -map -bpp 2 -max_palettes 2
 	$(PNG2ASSET) $(RESDIR)/font.png       -c $(RESDIR)/font.c       -map -bpp 2 -max_palettes 1
-	$(PNG2ASSET) $(RESDIR)/sprite.png     -c $(RESDIR)/sprite.c          -bpp 2 -max_palettes 1 -spr8x16
+	$(PNG2ASSET) $(RESDIR)/sprite.png     -c $(RESDIR)/sprite.c          -bpp 2 -max_palettes 1 -spr8x16 -sw 8 -sh 16
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	$(LCC) $(LCCFLAGS) -c -o $@ $<

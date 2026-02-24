@@ -41,12 +41,9 @@ static void gameplay_init(void) {
     }
     VBK_REG = 0;
 
-    /* Place sprites (8x16 mode: 2 sprites stacked = one 16x16 character) */
-    /* Sprite 0 = top half, Sprite 1 = bottom half */
-    set_sprite_tile(0, (uint8_t)(anim_frame * SPRITE_TILES_PER_FRAME));
-    set_sprite_tile(1, (uint8_t)(anim_frame * SPRITE_TILES_PER_FRAME + 2U));
+    /* Place sprite (8x16 mode: one hardware sprite per animation frame) */
+    set_sprite_tile(0, 0U);
     move_sprite(0, sprite_x, sprite_y);
-    move_sprite(1, sprite_x, (uint8_t)(sprite_y + 16U));
 }
 
 static void gameplay_update(void) {
@@ -62,18 +59,16 @@ static void gameplay_update(void) {
     if (joy & J_DOWN  && sprite_y < 128U)  sprite_y++;
     if (joy & J_UP    && sprite_y > 16U)   sprite_y--;
 
-    /* Animate sprite */
+    /* Animate sprite: advance frame every 10 vblanks */
     anim_counter++;
     if (anim_counter >= 10U) {
         anim_counter = 0;
         anim_frame = (uint8_t)((anim_frame + 1U) % SPRITE_FRAME_COUNT);
         set_sprite_tile(0, (uint8_t)(anim_frame * SPRITE_TILES_PER_FRAME));
-        set_sprite_tile(1, (uint8_t)(anim_frame * SPRITE_TILES_PER_FRAME + 2U));
     }
 
     /* Update sprite position */
     move_sprite(0, sprite_x, sprite_y);
-    move_sprite(1, sprite_x, (uint8_t)(sprite_y + 16U));
 
     /* Go to game over on START */
     if (joy_pressed & J_START) {

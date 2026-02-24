@@ -1,3 +1,6 @@
+/* Pre-generated tile data for use without running png2asset.
+   Run 'make convert' (requires GBDK-2020 installed) to regenerate
+   from res/background.png using png2asset. */
 #include "background.h"
 
 /* GBC background palettes (2 palettes x 4 colors each) */

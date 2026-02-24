@@ -19,8 +19,10 @@ void main(void) {
     set_bkg_data(0, BACKGROUND_TILE_COUNT, background_tiles);
     VBK_REG = 0;
 
-    /* Set GBC background palettes */
+    /* Set GBC background palettes (slots 0-1: sky and ground colors) */
     set_bkg_palette(0, BACKGROUND_PALETTE_COUNT, background_palettes);
+    /* Set GBC font palette (slot 2: black text on sky-matching background) */
+    set_bkg_palette(2, FONT_PALETTE_COUNT, font_palettes);
     /* Set GBC sprite palettes */
     set_sprite_palette(0, SPRITE_PALETTE_COUNT, sprite_palettes);
 

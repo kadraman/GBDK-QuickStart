@@ -1,8 +1,13 @@
+/* Pre-generated tile data for use without running png2asset.
+   Run 'make convert' (requires GBDK-2020 installed) to regenerate
+   from res/font.png using png2asset. */
 #include "font.h"
 
-/* GBC font palette (1 palette x 4 colors) */
+/* GBC font palette (1 palette x 4 colors).
+   Loaded at GBC palette slot 2 via set_bkg_palette(2, ...).
+   Color 0 = sky-matching background, Color 1 = black text. */
 const palette_color_t font_palettes[4] = {
-    RGB8(  0,  0,  0), RGB8(255,255,255), RGB8(170,170,170), RGB8( 85, 85, 85)
+    RGB8(155,200,234), RGB8(  0,  0,  0), RGB8(170,170,170), RGB8( 85, 85, 85)
 };
 
 /* Font tile data (96 tiles for ASCII 32-127, 16 bytes each) */

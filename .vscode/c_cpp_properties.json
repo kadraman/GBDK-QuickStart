@@ -5,15 +5,21 @@
             "includePath": [
                 "${workspaceFolder}/src",
                 "${workspaceFolder}/res",
-                "${env:HOME}/gbdk/include",
                 "${env:GBDK_HOME}/include"
             ],
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/src",
+                    "${env:GBDK_HOME}/include"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            },
             "defines": [
                 "__PORT_sm83",
                 "__TARGET_gb",
                 "__GBC__"
             ],
-            "compilerPath": "${env:HOME}/gbdk/bin/sdcc",
+            "compilerPath": "${env:GBDK_HOME}/bin/lcc",
             "cStandard": "c99",
             "intelliSenseMode": "gcc-x86"
         }

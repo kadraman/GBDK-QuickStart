@@ -1,7 +1,7 @@
 #ifndef BACKGROUND_H
 #define BACKGROUND_H
 
-#include <gb/gb.h>
+#include <gb/cgb.h>
 #include <stdint.h>
 
 #define BACKGROUND_TILE_COUNT    15U

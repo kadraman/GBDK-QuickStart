@@ -1,7 +1,7 @@
 #ifndef FONT_H
 #define FONT_H
 
-#include <gb/gb.h>
+#include <gb/cgb.h>
 #include <stdint.h>
 
 #define FONT_TILE_COUNT    96U
