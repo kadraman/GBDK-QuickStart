@@ -6,7 +6,7 @@ const palette_color_t sprite_palettes[4] = {
     RGB8(255,  0,255), RGB8(255,220,  0), RGB8( 50,100,200), RGB8( 20, 20, 20)
 };
 
-/* Sprite tile data (16 tiles for 4 animation frames 2x2 tiles each, 16 bytes each) */
+/* Sprite tile data (32 tiles for 8 animation frames, 4 tiles per frame, 16 bytes each) */
 const uint8_t sprite_tiles[512] = {
     0x07U, 0x07U, 0x0FU, 0x08U, 0x0FU, 0x0AU, 0x0FU, 0x08U,
     0x0FU, 0x0AU, 0x0FU, 0x09U, 0x10U, 0x1FU, 0x70U, 0x5FU,

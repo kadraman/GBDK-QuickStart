@@ -53,7 +53,10 @@ static void gameplay_update(void) {
     uint8_t joy = joypad();
     uint8_t joy_pressed = joy & ~prev_joy;
 
-    /* Move sprite with d-pad */
+    /* Move sprite with d-pad, clamped to visible screen area.
+       GBC screen is 160x144. Sprite hardware offset: x+8, y+16.
+       So screen x 0-159 = hardware 8-167; screen y 0-143 = hardware 16-159.
+       For an 8x16 sprite we keep it fully on-screen: x in [8,152], y in [16,128]. */
     if (joy & J_RIGHT && sprite_x < 152U) sprite_x++;
     if (joy & J_LEFT  && sprite_x > 8U)   sprite_x--;
     if (joy & J_DOWN  && sprite_y < 128U)  sprite_y++;

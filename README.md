@@ -12,7 +12,7 @@ A complete starter template for **GameBoy Color (GBC)** games, built with [GBDK-
 | SDK | GBDK-2020 (`lcc` / `sdcc`) |
 | Language | C (C99 compatible) |
 | Screens | Title → Gameplay → Game Over |
-| Sprites | 8×16 mode, 4-frame walk cycle |
+| Sprites | 8×16 mode, 8-frame walk cycle |
 | Background | 20×18 tilemap with 2 GBC palettes |
 | Font | 5×7 bitmap font, ASCII 32–127 |
 
@@ -48,7 +48,7 @@ GBC-Template/
 ├── res/
 │   ├── background.png      # 160×144 indexed PNG (4-color sky/cloud/grass/ground)
 │   ├── font.png            # 128×48 indexed PNG (96 chars, ASCII 32–127)
-│   ├── sprite.png          # 32×64 indexed PNG (4 animation frames, 16×16 each)
+│   ├── sprite.png          # 32×64 indexed PNG (8 animation frames, 16×16 each)
 │   ├── background.c/.h     # Pre-generated 2bpp tile data + GBC palettes + tilemap
 │   ├── font.c/.h           # Pre-generated 2bpp font tile data
 │   └── sprite.c/.h         # Pre-generated 2bpp sprite tile data + GBC palette
@@ -79,11 +79,9 @@ Emulicious obj/GBCTemplate.gbc
 
 ### 3. Regenerate assets from PNG (optional)
 
-If you edit the PNG files, regenerate the C/H files with the Python script:
+If you edit the PNG files, regenerate the C/H files using `png2asset` via the Makefile:
 
 ```bash
-python3 /tmp/gen_assets.py
-# Or use the Makefile target (requires png2asset from GBDK-2020):
 make convert
 ```
 

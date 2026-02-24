@@ -3,21 +3,13 @@
 #include <stdint.h>
 #include "states.h"
 #include "state_gameover.h"
+#include "utils.h"
 #include "../res/background.h"
 #include "../res/font.h"
 
 #define FONT_FIRST_TILE BACKGROUND_TILE_COUNT
-#define CHAR_TILE(c) ((uint8_t)((c) - 32U + FONT_FIRST_TILE))
 
 static uint8_t prev_joy;
-
-static void draw_text_go(uint8_t x, uint8_t y, const char* str) {
-    uint8_t i = 0;
-    while (str[i]) {
-        set_bkg_tile_xy(x + i, y, CHAR_TILE(str[i]));
-        i++;
-    }
-}
 
 static void gameover_init(void) {
     uint8_t x, y;
@@ -30,9 +22,9 @@ static void gameover_init(void) {
         }
     }
 
-    draw_text_go(5, 7,  "GAME OVER");
-    draw_text_go(3, 10, "SCORE: 000");
-    draw_text_go(2, 14, "PRESS START");
+    draw_text(5, 7,  "GAME OVER",   FONT_FIRST_TILE);
+    draw_text(3, 10, "SCORE: 000",  FONT_FIRST_TILE);
+    draw_text(2, 14, "PRESS START", FONT_FIRST_TILE);
 }
 
 static void gameover_update(void) {
