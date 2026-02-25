@@ -1,5 +1,5 @@
 #
-# GBC Template Makefile
+# GBDK QuickStart Template
 # Builds a GameBoy Color ROM using GBDK-2020
 #
 
@@ -35,7 +35,7 @@ endif
 LCC         = $(GBDK_HOME)/bin/lcc
 PNG2ASSET   = $(GBDK_HOME)/bin/png2asset
 
-PROJECTNAME = GBCTemplate
+PROJECTNAME = quickstart
 SRCDIR      = src
 OBJDIR      = obj
 RESDIR      = res
