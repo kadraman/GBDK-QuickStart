@@ -353,25 +353,30 @@ def write_sprite_files(name, frames_top, frames_bottom, palette_colors, out_dir=
 # ---------------------------------------------------------------------------
 
 def write_sprite_files_animated(name, animations, palette_colors,
-                                   pixel_chars, out_dir='.', size='8x16'):
+                                   pixel_chars, out_dir='.', size='8x16',
+                                   anim_speeds=None):
     """Write .c and .h for a sprite with multiple named animations.
 
     name          : base symbol name, e.g. 'player'.
     animations    : dict { anim_name: [frame, ...] }
                     Frame format depends on *size*:
-                      '8x16' - (top_rows, bot_rows)          2 tiles/frame
-                      '8x8'  - (content_rows,)               2 tiles/frame
-                                 stored as [content, blank] so content appears
-                                 in the top half of the 8x16 hardware slot;
-                                 use OAM Y = GROUND_Y + 8 to land on ground.
-                      '16x16'- (l_top, l_bot, r_top, r_bot)  4 tiles/frame
-                                 two side-by-side 8x16 OBJ slots.
+                      '8x8'  - flat list of 8 strings (8 chars each)
+                               stored as [content, blank] so content appears
+                               in the top half of the 8x16 hardware slot;
+                               all 8 rows should be used for ground alignment.
+                      '8x16' - flat list of 16 strings (8 chars each)
+                      '16x16'- flat list of 16 strings (16 chars each);
+                               split into 4 tiles: left-top, left-bot,
+                               right-top, right-bot.
     palette_colors: list of (r,g,b) tuples (length == 4).
     pixel_chars   : dict mapping character -> colour index (must include '.': 0).
     out_dir       : output directory.
     size          : sprite size string: '8x8', '8x16', or '16x16'.
+    anim_speeds   : optional dict { anim_name: int } vblanks-per-frame speed
+                    for each animation.  If provided, generates
+                    <NAME>_ANIM_<ANIM>_SPEED defines in the .h file.
     """
-    def _parse_tile(string_rows):
+    def _parse_tile_rows(string_rows):
         tile = []
         for row_str in string_rows:
             row = [pixel_chars.get(c, 0) for c in row_str]
@@ -390,27 +395,42 @@ def write_sprite_files_animated(name, animations, palette_colors,
         tiles_per_frame = 4
         for anim_name, frames in animations.items():
             start_tile = len(all_tiles)
-            for l_top, l_bot, r_top, r_bot in frames:
-                all_tiles.append(_parse_tile(l_top))
-                all_tiles.append(_parse_tile(l_bot))
-                all_tiles.append(_parse_tile(r_top))
-                all_tiles.append(_parse_tile(r_bot))
+            for frame_rows in frames:
+                assert len(frame_rows) == 16, (
+                    f"16x16 frame for '{anim_name}' must have 16 rows "
+                    f"(got {len(frame_rows)})")
+                # Split 16x16 frame into 4 tiles
+                l_top = [[pixel_chars.get(frame_rows[r][c], 0) for c in range(8)]
+                         for r in range(8)]
+                l_bot = [[pixel_chars.get(frame_rows[r][c], 0) for c in range(8)]
+                         for r in range(8, 16)]
+                r_top = [[pixel_chars.get(frame_rows[r][c], 0) for c in range(8, 16)]
+                         for r in range(8)]
+                r_bot = [[pixel_chars.get(frame_rows[r][c], 0) for c in range(8, 16)]
+                         for r in range(8, 16)]
+                all_tiles.extend([l_top, l_bot, r_top, r_bot])
             anim_info.append((anim_name, start_tile, len(frames)))
     elif size == '8x8':
         tiles_per_frame = 2
         for anim_name, frames in animations.items():
             start_tile = len(all_tiles)
-            for (content_rows,) in frames:
-                all_tiles.append(_parse_tile(content_rows))
+            for frame_rows in frames:
+                assert len(frame_rows) == 8, (
+                    f"8x8 frame for '{anim_name}' must have 8 rows "
+                    f"(got {len(frame_rows)})")
+                all_tiles.append(_parse_tile_rows(frame_rows))
                 all_tiles.append(_blank_tile)
             anim_info.append((anim_name, start_tile, len(frames)))
-    else:  # '8x16' - default / backward-compatible
+    else:  # '8x16' - flat list of 16 rows, 8 chars each
         tiles_per_frame = 2
         for anim_name, frames in animations.items():
             start_tile = len(all_tiles)
-            for top_rows, bot_rows in frames:
-                all_tiles.append(_parse_tile(top_rows))
-                all_tiles.append(_parse_tile(bot_rows))
+            for frame_rows in frames:
+                assert len(frame_rows) == 16, (
+                    f"8x16 frame for '{anim_name}' must have 16 rows "
+                    f"(got {len(frame_rows)})")
+                all_tiles.append(_parse_tile_rows(frame_rows[:8]))
+                all_tiles.append(_parse_tile_rows(frame_rows[8:]))
             anim_info.append((anim_name, start_tile, len(frames)))
 
     tile_count      = len(all_tiles)
@@ -457,9 +477,12 @@ def write_sprite_files_animated(name, animations, palette_colors,
     ]
     for anim_name, start_tile, frame_count in anim_info:
         au = anim_name.upper()
+        speed = (anim_speeds or {}).get(anim_name)
         h_lines.append(f'/* Animation: {anim_name} */')
         h_lines.append(f'#define {NAME}_ANIM_{au}_START   {start_tile}U')
         h_lines.append(f'#define {NAME}_ANIM_{au}_FRAMES  {frame_count}U')
+        if speed is not None:
+            h_lines.append(f'#define {NAME}_ANIM_{au}_SPEED   {speed}U')
         h_lines.append('')
     h_lines += [
         f'extern const palette_color_t {name}_palettes[{pal_count_total}];',

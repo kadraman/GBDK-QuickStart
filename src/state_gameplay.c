@@ -5,6 +5,8 @@
 #include "state_gameplay.h"
 #include "sprite.h"
 #include "sprite_manager.h"
+#include "sprite_player.h"
+#include "sprite_enemy.h"
 #include "../res/background.h"
 #include "../res/font.h"
 #include "../res/player.h"
@@ -15,54 +17,32 @@
  * -------------------------------------------------------------------- */
 #define FONT_FIRST_TILE  BACKGROUND_TILE_COUNT
 
-/* Player physics */
-#define GROUND_Y_HW     80U    /* sprite OAM Y when standing on ground         */
-#define JUMP_VY        (-6)    /* initial jump velocity (negative = upward)    */
-#define ANIM_WALK_SPD   8U     /* vblanks between walk animation frames        */
-#define ANIM_IDLE_SPD  20U     /* vblanks between idle animation frames        */
-#define WALK_SPEED      1U     /* world pixels per frame                       */
-#define MIN_WORLD_X     8U     /* minimum player world-X (hardware X-8)        */
+/* World / ground coordinates (world_y = screen top of sprite)
+ *   OAM Y = world_y + 16
+ *   Player on ground: world_y = 64  -> OAM Y 80, feet at screen Y 79
+ *   Enemy  on ground: world_y = 72  -> OAM Y 88, feet at screen Y 79    */
+#define GROUND_Y          64U   /* player world_y when standing on ground */
+#define ENEMY_GROUND_Y    72U   /* enemy  world_y when standing on ground */
 
-/* Enemy */
-#define ENEMY_GROUND_Y_HW  (GROUND_Y_HW + 8U) /* OAM Y placing 8x8 content at ground */
-#define ENEMY_START_X      80U                 /* initial world-X                     */
-#define ENEMY_PATROL_LEFT  10U                 /* left patrol boundary (world-X)      */
-#define ENEMY_PATROL_RIGHT 180U                /* right patrol boundary (world-X)     */
-#define ANIM_ENEMY_SPD     12U                 /* vblanks between enemy anim frames   */
-
-/* Scrolling */
-#define SCROLL_R_LIMIT  100U   /* scroll right when screen-X exceeds this      */
-#define SCROLL_L_LIMIT   60U   /* scroll left  when screen-X falls below this  */
-#define MAX_SCROLL_X    ((BACKGROUND_MAP_WIDTH - 20U) * 8U)  /* 96 px for 32-tile map */
-#define MAX_WORLD_X     (BACKGROUND_MAP_WIDTH * 8U - 8U)    /* 248 */
+/* Win condition */
+#define CHECKPOINT_X     220U   /* world-X that triggers the win state   */
 
 /* HUD window */
-#define HUD_WIN_Y       112U   /* window Y: bottom 4 tile rows (32 px)         */
-#define HUD_PAL          3U    /* BKG palette slot for HUD text (white)        */
-#define HUD_RED_PAL      4U    /* BKG palette slot for hearts (red)            */
+#define HUD_WIN_Y        112U   /* window Y: bottom 4 tile rows (32 px)  */
+#define HUD_PAL            3U   /* BKG palette slot for HUD text (white) */
+#define HUD_RED_PAL        4U   /* BKG palette slot for hearts (red)     */
 
 /* Collision */
-#define COLLISION_COOLDOWN  60U  /* vblanks of invincibility after taking a hit */
+#define COLLISION_COOLDOWN  60U  /* vblanks of invincibility after a hit */
 
 /* -----------------------------------------------------------------------
- * Player state
+ * Game state
  * -------------------------------------------------------------------- */
-typedef enum { PSTATE_IDLE, PSTATE_WALK, PSTATE_JUMP } PlayerState;
-
-static Sprite      *player_sprite;
-static Sprite      *enemy_sprite;
-
-static int8_t       player_vy;        /* vertical velocity (negative = up)     */
-static uint8_t      player_facing_r;  /* 1 = right, 0 = left                   */
-static PlayerState  player_state;
-static uint8_t      camera_x;         /* SCX_REG value (0..MAX_SCROLL_X)        */
-static uint16_t     score;
-static uint8_t      lives;
-static uint8_t      prev_joy;
-
-static int8_t       enemy_dx;         /* enemy patrol direction (+1 or -1)      */
-static uint8_t      enemy_anim_ctr;   /* enemy animation frame counter          */
-static uint8_t      collision_cooldown; /* frames of post-hit invincibility      */
+static uint8_t  camera_x;
+static uint16_t score;
+static uint8_t  lives;
+static uint8_t  prev_joy;
+static uint8_t  collision_cooldown;
 
 /* -----------------------------------------------------------------------
  * HUD helpers
@@ -107,7 +87,7 @@ static void hud_update_score(void)
 static void hud_update_lives(void)
 {
     uint8_t heart_tile = (uint8_t)(FONT_FIRST_TILE + FONT_TILE_HEART);
-    uint8_t space_tile = (uint8_t)(FONT_FIRST_TILE);   /* space = empty heart slot */
+    uint8_t space_tile = (uint8_t)(FONT_FIRST_TILE);
     uint8_t i;
 
     VBK_REG = 0;
@@ -126,15 +106,12 @@ static void hud_init(void)
 {
     uint8_t x, row;
 
-     /* Position window at bottom of screen
-         WX register expects value = window_x + 7, so use 7 to align at left */
-     move_win(7U, HUD_WIN_Y);
+    move_win(7U, HUD_WIN_Y);
 
-    /* Fill all 4 window rows with HUD background (space tiles + HUD palette) */
     VBK_REG = 0;
     for (row = 0; row < 4U; row++) {
         for (x = 0; x < 20U; x++) {
-            set_win_tile_xy(x, row, (uint8_t)(FONT_FIRST_TILE)); /* space tile */
+            set_win_tile_xy(x, row, (uint8_t)(FONT_FIRST_TILE));
         }
     }
     VBK_REG = 1;
@@ -145,11 +122,8 @@ static void hud_init(void)
     }
     VBK_REG = 0;
 
-    /* Row 1: "SCORE: 0000" */
     hud_write_text(0U, 1U, "SCORE: ", HUD_PAL);
     hud_update_score();
-
-    /* Row 2: "LIVES: " + hearts */
     hud_write_text(0U, 2U, "LIVES: ", HUD_PAL);
     hud_update_lives();
 }
@@ -159,36 +133,23 @@ static void hud_init(void)
  * -------------------------------------------------------------------- */
 static void gameplay_init(void)
 {
-    player_vy       = 0;
-    player_facing_r = 1U;
-    player_state    = PSTATE_IDLE;
-    camera_x        = 0;
-    score           = 0;
-    lives           = 3;
-    prev_joy        = 0;
-    enemy_dx        = 1;
-    enemy_anim_ctr  = 0;
+    camera_x           = 0;
+    score              = 0;
+    lives              = 3;
+    prev_joy           = 0;
     collision_cooldown = 0;
 
-    /* Allocate sprites from the manager */
     sprite_manager_init();
 
-    /* Player: 16x16 -> 2 OBJ slots (OBJ 0 = left half, OBJ 1 = right half) */
-    player_sprite = sprite_manager_alloc(0U, 2U, 8U, 16U, 0U, PLAYER_TILES_PER_FRAME);
-    player_sprite->world_x = 20U;
-    player_sprite->hw_y    = GROUND_Y_HW;
+    /* Player: 16x16 -> 2 OBJ slots */
+    player_init(20U, GROUND_Y, 0U);
 
-    /* Enemy: 8x8 -> 1 OBJ slot (OBJ 2), tile_base after player tiles */
-    enemy_sprite = sprite_manager_alloc(2U, 1U, 8U, 8U,
-                                        PLAYER_TILE_COUNT,
-                                        ENEMY_TILES_PER_FRAME);
-    enemy_sprite->world_x = ENEMY_START_X;
-    enemy_sprite->hw_y    = ENEMY_GROUND_Y_HW;
+    /* Enemy: 8x8 -> 1 OBJ slot; tile_base after player tiles */
+    enemy_init(80U, ENEMY_GROUND_Y, PLAYER_TILE_COUNT);
 
-    /* Load full background tilemap (32x18) in one call */
+    /* Load background tilemap */
     set_bkg_tiles(0, 0, BACKGROUND_MAP_WIDTH, BACKGROUND_MAP_HEIGHT,
                   background_map);
-    /* Load per-tile palette attributes from pre-built attr_map */
     VBK_REG = 1;
     set_bkg_tiles(0, 0, BACKGROUND_MAP_WIDTH, BACKGROUND_MAP_HEIGHT,
                   background_attr_map);
@@ -197,175 +158,58 @@ static void gameplay_init(void)
     SCX_REG = 0;
     SCY_REG = 0;
 
-    /* Initialise player OBJ tiles and properties */
-    set_sprite_tile(0U, PLAYER_ANIM_IDLE_START);
-    set_sprite_tile(1U, (uint8_t)(PLAYER_ANIM_IDLE_START + 2U));
-    set_sprite_prop(0U, 0U);
-    set_sprite_prop(1U, 0U);
-    sprite_manager_update_hw(player_sprite, camera_x);
-
-    /* Initialise enemy OBJ tile and property (palette slot 1) */
-    set_sprite_tile(2U, (uint8_t)(PLAYER_TILE_COUNT + ENEMY_ANIM_WALK_START));
-    set_sprite_prop(2U, 0x01U);  /* GBC sprite palette 1 */
-    sprite_manager_update_hw(enemy_sprite, camera_x);
-
     hud_init();
     SHOW_WIN;
 }
 
 static void gameplay_update(void)
 {
-    uint8_t joy        = joypad();
-    uint8_t joy_press  = (uint8_t)(joy & ~prev_joy);
-    uint8_t moved      = 0;
-    int16_t new_y;
-    uint8_t screen_x, hw_x;
-    uint8_t tile_idx, prop;
-    uint8_t anim_speed;
-    uint8_t anim_start, anim_frames;
+    uint8_t joy       = joypad();
+    uint8_t joy_press = (uint8_t)(joy & ~prev_joy);
+    uint8_t events;
 
-    /* --- Horizontal movement --- */
-    if (joy & J_RIGHT) {
-        player_facing_r = 1U;
-        if (player_sprite->world_x < MAX_WORLD_X) {
-            player_sprite->world_x = (uint8_t)(player_sprite->world_x + WALK_SPEED);
-            moved = 1U;
-        }
-    } else if (joy & J_LEFT) {
-        player_facing_r = 0U;
-        if (player_sprite->world_x > MIN_WORLD_X) {
-            player_sprite->world_x = (uint8_t)(player_sprite->world_x - WALK_SPEED);
-            moved = 1U;
-        }
+    /* --- Update player (handles movement, physics, animation, camera) --- */
+    events = player_update(joy, joy_press, &camera_x);
+
+    if (events & PLAYER_EVENT_JUMPED) {
+        score++;
+        hud_update_score();
     }
 
-    /* --- Jump (A or B button, only when grounded) --- */
-    if ((joy_press & J_A) || (joy_press & J_B)) {
-        if (player_state != PSTATE_JUMP) {
-            player_vy    = JUMP_VY;
-            player_state = PSTATE_JUMP;
-            score++;
-            hud_update_score();
+    /* --- Fell into a gap: lose a life and restart or game over --- */
+    if (events & PLAYER_EVENT_FELL_GAP) {
+        if (lives > 0U) {
+            lives--;
+            hud_update_lives();
         }
-    }
-
-    /* --- Vertical physics --- */
-    if (player_state == PSTATE_JUMP) {
-        new_y = (int16_t)player_sprite->hw_y + player_vy;
-        if (new_y < 16) new_y = 16;                 /* top of screen clamp  */
-        if (new_y >= (int16_t)GROUND_Y_HW) {
-            new_y            = (int16_t)GROUND_Y_HW;
-            player_vy        = 0;
-            player_state     = moved ? PSTATE_WALK : PSTATE_IDLE;
+        if (lives == 0U) {
+            switch_state(STATE_GAME_OVER);
         } else {
-            player_vy++;                             /* gravity              */
+            switch_state(STATE_GAMEPLAY);  /* restart from beginning */
         }
-        player_sprite->hw_y = (uint8_t)new_y;
-    } else {
-        /* Ground-state transition */
-        PlayerState next = moved ? PSTATE_WALK : PSTATE_IDLE;
-        if (next != player_state) {
-            player_state               = next;
-            player_sprite->anim_frame   = 0;
-            player_sprite->anim_counter = 0;
-        }
+        return;
     }
 
-    /* --- Camera / scroll --- */
-    screen_x = (uint8_t)(player_sprite->world_x - camera_x);
-    if (screen_x > SCROLL_R_LIMIT && camera_x < MAX_SCROLL_X) {
-        camera_x++;
-    } else if (screen_x < SCROLL_L_LIMIT && camera_x > 0) {
-        camera_x--;
+    /* --- Update enemy (handles patrol, animation, hardware move) --- */
+    enemy_update(camera_x);
+
+    /* --- Win condition: player reaches checkpoint --- */
+    if (player_get_sprite()->world_x >= CHECKPOINT_X) {
+        switch_state(STATE_WIN);
+        return;
     }
-    SCX_REG = camera_x;
-
-    /* --- Player animation selection --- */
-    if (player_state == PSTATE_JUMP) {
-        /* Frame driven by velocity: 0 = rising, 1 = falling */
-        player_sprite->anim_frame = (player_vy < 0) ? 0U : 1U;
-        tile_idx = (uint8_t)(PLAYER_ANIM_JUMP_START +
-                              player_sprite->anim_frame * PLAYER_TILES_PER_FRAME);
-    } else {
-        if (player_state == PSTATE_WALK) {
-            anim_speed  = ANIM_WALK_SPD;
-            anim_start  = PLAYER_ANIM_WALK_START;
-            anim_frames = PLAYER_ANIM_WALK_FRAMES;
-        } else {
-            anim_speed  = ANIM_IDLE_SPD;
-            anim_start  = PLAYER_ANIM_IDLE_START;
-            anim_frames = PLAYER_ANIM_IDLE_FRAMES;
-        }
-        player_sprite->anim_counter++;
-        if (player_sprite->anim_counter >= anim_speed) {
-            player_sprite->anim_counter = 0;
-            player_sprite->anim_frame   =
-                (uint8_t)((player_sprite->anim_frame + 1U) % anim_frames);
-        }
-        tile_idx = (uint8_t)(anim_start +
-                              player_sprite->anim_frame * PLAYER_TILES_PER_FRAME);
-    }
-
-    /* 16x16 player: OBJ 0 = left half (tile_idx, tile_idx+1)
-     *               OBJ 1 = right half (tile_idx+2, tile_idx+3) */
-    set_sprite_tile(0U, tile_idx);
-    set_sprite_tile(1U, (uint8_t)(tile_idx + 2U));
-
-    /* --- Horizontal flip for left-facing --- */
-    prop = get_sprite_prop(0U);
-    if (player_facing_r) {
-        prop = (uint8_t)(prop & ~S_FLIPX);
-    } else {
-        prop = (uint8_t)(prop | S_FLIPX);
-    }
-    set_sprite_prop(0U, prop);
-
-    prop = get_sprite_prop(1U);
-    if (player_facing_r) {
-        prop = (uint8_t)(prop & ~S_FLIPX);
-    } else {
-        prop = (uint8_t)(prop | S_FLIPX);
-    }
-    set_sprite_prop(1U, prop);
-
-    /* --- Move player OBJ slots --- */
-    hw_x = (uint8_t)(player_sprite->world_x - camera_x + 8U);
-    move_sprite(0U, hw_x, player_sprite->hw_y);
-    move_sprite(1U, (uint8_t)(hw_x + 8U), player_sprite->hw_y);
-
-    /* --- Enemy patrol movement --- */
-    enemy_sprite->world_x = (uint8_t)((int16_t)enemy_sprite->world_x + enemy_dx);
-    if (enemy_sprite->world_x >= ENEMY_PATROL_RIGHT) { enemy_dx = -1; }
-    if (enemy_sprite->world_x <= ENEMY_PATROL_LEFT)  { enemy_dx =  1; }
-
-    /* --- Enemy animation --- */
-    enemy_anim_ctr++;
-    if (enemy_anim_ctr >= ANIM_ENEMY_SPD) {
-        enemy_anim_ctr = 0;
-        enemy_sprite->anim_frame =
-            (uint8_t)((enemy_sprite->anim_frame + 1U) % ENEMY_ANIM_WALK_FRAMES);
-    }
-    set_sprite_tile(2U, (uint8_t)(enemy_sprite->tile_base +
-                                   enemy_sprite->anim_frame * ENEMY_TILES_PER_FRAME));
-
-    /* Flip enemy to face direction of travel */
-    prop = get_sprite_prop(2U);
-    if (enemy_dx < 0) {
-        prop = (uint8_t)(prop | S_FLIPX);
-    } else {
-        prop = (uint8_t)(prop & ~S_FLIPX);
-    }
-    set_sprite_prop(2U, prop);
-
-    sprite_manager_update_hw(enemy_sprite, camera_x);
 
     /* --- Sprite collision: player vs enemy --- */
     if (collision_cooldown > 0U) {
         collision_cooldown--;
-    } else if (sprites_collide(player_sprite, enemy_sprite)) {
+    } else if (sprites_collide(player_get_sprite(), enemy_get_sprite())) {
         if (lives > 0U) {
             lives--;
             hud_update_lives();
+        }
+        if (lives == 0U) {
+            switch_state(STATE_GAME_OVER);
+            return;
         }
         collision_cooldown = COLLISION_COOLDOWN;
     }
@@ -375,10 +219,10 @@ static void gameplay_update(void)
 
 static void gameplay_cleanup(void)
 {
-    if (player_sprite) { sprite_manager_free(player_sprite); player_sprite = 0; }
-    if (enemy_sprite)  { sprite_manager_free(enemy_sprite);  enemy_sprite  = 0; }
-    HIDE_WIN;               /* hide HUD window */
-    SCX_REG = 0;            /* reset background scroll */
+    player_cleanup();
+    enemy_cleanup();
+    HIDE_WIN;
+    SCX_REG = 0;
 }
 
 const GameState state_gameplay = {

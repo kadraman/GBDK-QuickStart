@@ -1,23 +1,25 @@
 """
 Player sprite definition for generate_sprites (gen_sprite.py).
 
-SIZE = '16x16': each frame is a 4-tuple (l_top, l_bot, r_top, r_bot).
-  l_top / l_bot  : left  8x8 half (top and bottom rows)
-  r_top / r_bot  : right 8x8 half (transparent – occupies 16x16 OBJ space)
+SIZE = '16x16': each frame is a flat list of 16 strings, each exactly
+16 characters wide.  The builder splits it into 4 tiles:
+  left-top  (rows  0-7, cols  0-7)
+  left-bot  (rows 8-15, cols  0-7)
+  right-top (rows  0-7, cols 8-15)
+  right-bot (rows 8-15, cols 8-15)
 
-Each half is 8 strings of 8 characters; each character maps to a
-colour index via PIXEL_CHARS.  '.' is always transparent (index 0).
+Art occupies the left half; the right half is transparent, giving the
+sprite its 16-wide OBJ canvas while keeping art in 8 columns.
+
+Pixels are placed in the lower portion of the 16×16 grid (row 15 =
+ground contact) so the player appears to stand on the ground.
 
 The character faces RIGHT by default.
-Left-facing is achieved in C by setting the S_FLIPX sprite property
-on both OBJ slots.
-
-Pixels are placed in the lower half of the 16x16 grid (head in l_top,
-legs/feet in l_bot row 7) so the sprite appears grounded at GROUND_Y.
+Left-facing is achieved in C by setting S_FLIPX on both OBJ slots.
 
 Animation list
 --------------
-  idle (2 frames)  – stationary breathing bob
+  idle (2 frames)  – stationary stance
   walk (4 frames)  – 4-step walking cycle
   jump (2 frames)  – ascending / descending
   die  (3 frames)  – hit, falling, lying flat
@@ -38,168 +40,162 @@ PALETTE = [
 PIXEL_CHARS = {'.': 0, 'Y': 1, 'B': 2, 'D': 3}
 
 # ---------------------------------------------------------------------------
-# Right half is transparent – provides 16-wide OBJ space while keeping art
+# Shared top section (rows 0-8): head + upper body
+# Each list is 9 strings of 16 chars.
 # ---------------------------------------------------------------------------
-_EMPTY = [
-    '........',
-    '........',
-    '........',
-    '........',
-    '........',
-    '........',
-    '........',
-    '........',
+_TOP_NORMAL = [
+    '................',   # row  0  sky
+    '................',   # row  1  sky
+    '...DDDD.........',   # row  2  head outline top
+    '..DYYYYD........',   # row  3  face
+    '..DYYDYD........',   # row  4  face with eye
+    '..DYYYYD........',   # row  5  face lower
+    '..DBBBD.........',   # row  6  body top
+    '.DBBBBD.........',   # row  7  body + left-arm outline
+    '..BBBBD.........',   # row  8  body
+]
+_TOP_JUMP = [
+    '................',
+    '................',
+    '...DDDD.........',
+    '..DYYYYD........',
+    '..DYYDYD........',
+    '..DYYYYD........',
+    '.DBBBBD.........',   # arms wide
+    '.DBBBBD.........',
+    '..BBBBD.........',
+]
+_TOP_HIT = [
+    '................',
+    '................',
+    '...DDDD.........',
+    '..DDDDD.........',   # furrowed brow
+    '..DYYDYD........',
+    '..DDDDD.........',   # clenched mouth
+    '..DBBBD.........',
+    '.DBBBBD.........',
+    '..BBBBD.........',
 ]
 
 # ---------------------------------------------------------------------------
-# Left half top (head + upper body, 8x8)
+# Shared bottom section (rows 9-15): belt + legs + boots
+# Each list is 7 strings of 16 chars.
 # ---------------------------------------------------------------------------
-_L_HEAD = [            # head + body (right-facing)
-    '..DDDD..',      # head outline top
-    '.DYYYYD.',      # face
-    '.DYYDYD.',      # face with eye (D at col 4)
-    '.DYYYYD.',      # face lower
-    '.DBBBD..',      # body top
-    'DBBBBD..',      # body with left-arm outline
-    '.BBBBD..',      # body
-    '.DDDDD..',      # belt
+_BOT_IDLE = [
+    '..DDDDD.........',   # row  9  belt
+    '...BB...........',   # row 10  legs
+    '...BB...........',   # row 11
+    '...BB...........',   # row 12
+    '...BB...........',   # row 13
+    '..DDDD..........',   # row 14  boots
+    '..DDDD..........',   # row 15  boots – ground contact
 ]
-_L_HEAD_JUMP = [       # arms raised for jump
-    '..DDDD..',
-    '.DYYYYD.',
-    '.DYYDYD.',
-    '.DYYYYD.',
-    'DBBBBD..',      # arms wide
-    'DBBBBD..',
-    '.BBBBD..',
-    '.DDDDD..',
+_BOT_WALK1 = [           # right leg forward, left leg back
+    '..DDDDD.........',
+    '..B.B...........',
+    '..B.B...........',
+    '..B.B...........',
+    '.DB.B...........',
+    '.D..B...........',
+    '.D..............',
 ]
-_L_HEAD_HIT = [        # grimace / hit face
-    '..DDDD..',
-    '.DDDDD..',      # furrowed brow
-    '.DYYDYD.',
-    '.DDDDD..',      # clenched mouth
-    '.DBBBD..',
-    'DBBBBD..',
-    '.BBBBD..',
-    '.DDDDD..',
+_BOT_WALK3 = [           # left leg forward, right leg back
+    '..DDDDD.........',
+    '..B.B...........',
+    '..B.B...........',
+    '..B.B...........',
+    '..B.BD..........',
+    '...BD...........',
+    '...D............',
+]
+_BOT_JUMP_UP = [         # ascending: knees tucked
+    '..DDDDD.........',
+    '................',
+    '..BBB...........',
+    '..BBB...........',
+    '..B.B...........',
+    '.D..D...........',
+    '.D..D...........',
+]
+_BOT_JUMP_DN = [         # descending: legs stretched
+    '..DDDDD.........',
+    '...BB...........',
+    '...BB...........',
+    '...BB...........',
+    '..B.B...........',
+    '..D.D...........',
+    '..D.D...........',
+]
+_BOT_DIE0 = [            # stagger – one leg buckled
+    '..DDDDD.........',
+    '...B............',
+    '...B............',
+    '..BB............',
+    '..BB............',
+    '..D.............',
+    '.D..............',
+]
+_BOT_DIE1 = [            # falling sideways
+    '..DDDDD.........',
+    '..BBB...........',
+    '.BBBB...........',
+    '.BBBB...........',
+    '.BBBB...........',
+    '.DD.............',
+    '.D..............',
+]
+
+# Die-2 is a special flat-on-ground pose using a single 16-row frame
+_DIE2 = [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '.DDDDDDD........',   # body outline (horizontal)
+    'DYYYYYDDD.......',   # head + body + legs
+    '.DBBBBBBD.......',
+    '.DDDDDDD........',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
 ]
 
 # ---------------------------------------------------------------------------
-# Left half bottom (legs, 8x8)
+# Animation speeds (vblanks per frame)
 # ---------------------------------------------------------------------------
-_L_LEGS_IDLE = [
-    '..BB....',
-    '..BB....',
-    '..BB....',
-    '..BB....',
-    '.DDD....',      # boots (both feet together)
-    '.DDD....',
-    '........',
-    '........',
-]
-_L_LEGS_WALK1 = [      # right leg forward (left leg stepping back)
-    '.B.B....',
-    '.B.B....',
-    '.B.B....',
-    'DB.B....',      # left leg retreats
-    'D..B....',
-    'D.......',      # only left boot visible at far left
-    '........',
-    '........',
-]
-_L_LEGS_WALK3 = [      # left leg forward (right leg stepping back)
-    '.B.B....',
-    '.B.B....',
-    '.B.B....',
-    '.B.BD...',      # right leg retreats
-    '...BD...',
-    '...D....',      # only right boot visible
-    '........',
-    '........',
-]
-_L_LEGS_JUMP_UP = [    # ascending: knees tucked
-    '........',
-    '.BBB....',
-    '.BBB....',
-    '.B.B....',
-    'D..D....',      # feet pulled up/back
-    'D..D....',
-    '........',
-    '........',
-]
-_L_LEGS_JUMP_DN = [    # descending: legs stretched
-    '..BB....',
-    '..BB....',
-    '..BB....',
-    '.B.B....',      # spreading for landing
-    '.D.D....',
-    '.D.D....',
-    '........',
-    '........',
-]
-_L_LEGS_DIE0 = [       # stagger – one leg buckled
-    '..B.....',
-    '..B.....',
-    '.BB.....',
-    '.BB.....',
-    '.D......',
-    'D.......',
-    '........',
-    '........',
-]
-_L_LEGS_DIE1 = [       # falling sideways
-    '.BBB....',
-    'BBBB....',
-    'BBBB....',
-    'BBBB....',
-    'DD......',
-    'D.......',
-    '........',
-    '........',
-]
-_L_BODY_DIE2_TOP = [   # lying flat – body horizontal
-    '........',
-    'DDDDDDD.',
-    'DYYYYYD.',
-    'DBBBBBBD',
-    'DDDDDDD.',
-    '........',
-    '........',
-    '........',
-]
-_L_BODY_DIE2_BOT = [   # lying flat – legs horizontal
-    'DDDDDDD.',
-    '........',
-    '........',
-    '........',
-    '........',
-    '........',
-    '........',
-    '........',
-]
+ANIM_SPEEDS = {
+    'idle': 20,
+    'walk':  8,
+    'jump':  1,
+    'die':  20,
+}
 
 # ---------------------------------------------------------------------------
-# Animation table
+# Animation table – each frame is a 16-row list
 # ---------------------------------------------------------------------------
 ANIMATIONS = {
     'idle': [
-        (_L_HEAD,          _L_LEGS_IDLE,   _EMPTY, _EMPTY),  # frame 0
-        (_L_HEAD,          _L_LEGS_IDLE,   _EMPTY, _EMPTY),  # frame 1
+        _TOP_NORMAL + _BOT_IDLE,   # frame 0
+        _TOP_NORMAL + _BOT_IDLE,   # frame 1 (same – extend for blink if desired)
     ],
     'walk': [
-        (_L_HEAD,          _L_LEGS_IDLE,   _EMPTY, _EMPTY),  # frame 0: neutral
-        (_L_HEAD,          _L_LEGS_WALK1,  _EMPTY, _EMPTY),  # frame 1: right leg forward
-        (_L_HEAD,          _L_LEGS_IDLE,   _EMPTY, _EMPTY),  # frame 2: neutral
-        (_L_HEAD,          _L_LEGS_WALK3,  _EMPTY, _EMPTY),  # frame 3: left leg forward
+        _TOP_NORMAL + _BOT_IDLE,   # frame 0: neutral
+        _TOP_NORMAL + _BOT_WALK1,  # frame 1: right leg forward
+        _TOP_NORMAL + _BOT_IDLE,   # frame 2: neutral
+        _TOP_NORMAL + _BOT_WALK3,  # frame 3: left leg forward
     ],
     'jump': [
-        (_L_HEAD_JUMP,     _L_LEGS_JUMP_UP, _EMPTY, _EMPTY), # frame 0: ascending
-        (_L_HEAD_JUMP,     _L_LEGS_JUMP_DN, _EMPTY, _EMPTY), # frame 1: descending
+        _TOP_JUMP + _BOT_JUMP_UP,  # frame 0: ascending
+        _TOP_JUMP + _BOT_JUMP_DN,  # frame 1: descending
     ],
     'die': [
-        (_L_HEAD_HIT,      _L_LEGS_DIE0,    _EMPTY, _EMPTY), # frame 0: hit
-        (_L_HEAD_HIT,      _L_LEGS_DIE1,    _EMPTY, _EMPTY), # frame 1: falling
-        (_L_BODY_DIE2_TOP, _L_BODY_DIE2_BOT,_EMPTY, _EMPTY), # frame 2: flat
+        _TOP_HIT  + _BOT_DIE0,     # frame 0: hit
+        _TOP_HIT  + _BOT_DIE1,     # frame 1: falling
+        _DIE2,                      # frame 2: flat on ground
     ],
 }

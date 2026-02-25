@@ -74,6 +74,7 @@ def process_definition(defn_path):
     pixel_chars = dict(getattr(mod, 'PIXEL_CHARS', {}))
     pixel_chars['.'] = 0   # '.' is always transparent
     size        = getattr(mod, 'SIZE', '8x16')
+    anim_speeds = getattr(mod, 'ANIM_SPEEDS', None)
 
     animations = mod.ANIMATIONS
 
@@ -86,28 +87,20 @@ def process_definition(defn_path):
 
     if size == '16x16':
         for anim_frames in animations.values():
-            for l_top, l_bot, r_top, r_bot in anim_frames:
-                for i, row_str in enumerate(l_top):
-                    left  = [pixel_chars.get(c, 0) for c in row_str]
-                    right = [pixel_chars.get(c, 0) for c in r_top[i]]
-                    pixel_grid.append(left + right)
-                for i, row_str in enumerate(l_bot):
-                    left  = [pixel_chars.get(c, 0) for c in row_str]
-                    right = [pixel_chars.get(c, 0) for c in r_bot[i]]
-                    pixel_grid.append(left + right)
+            for frame_rows in anim_frames:
+                for row_str in frame_rows:
+                    pixel_grid.append([pixel_chars.get(c, 0) for c in row_str])
         png_dims = f'16x{n_total_frames * 16}'
     elif size == '8x8':
         for anim_frames in animations.values():
-            for (content_rows,) in anim_frames:
-                for row_str in content_rows:
+            for frame_rows in anim_frames:
+                for row_str in frame_rows:
                     pixel_grid.append([pixel_chars.get(c, 0) for c in row_str])
         png_dims = f'8x{n_total_frames * 8}'
     else:  # '8x16'
         for anim_frames in animations.values():
-            for top_rows, bot_rows in anim_frames:
-                for row_str in top_rows:
-                    pixel_grid.append([pixel_chars.get(c, 0) for c in row_str])
-                for row_str in bot_rows:
+            for frame_rows in anim_frames:
+                for row_str in frame_rows:
                     pixel_grid.append([pixel_chars.get(c, 0) for c in row_str])
         png_dims = f'8x{n_total_frames * 16}'
 
@@ -122,6 +115,7 @@ def process_definition(defn_path):
         pixel_chars=pixel_chars,
         out_dir=out_dir,
         size=size,
+        anim_speeds=anim_speeds,
     )
 
 

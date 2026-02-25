@@ -237,8 +237,38 @@ TILES = [
 
     # 14: Deep ground (solid dark)
     [[D]*8]*8,
+
+    # 15: Wall / ground block (solid dark obstacle the player must jump over)
+    [[D,D,D,D,D,D,D,D],
+     [D,W,W,W,W,W,W,D],
+     [D,W,D,W,W,D,W,D],
+     [D,W,W,W,W,W,W,D],
+     [D,W,W,D,W,W,W,D],
+     [D,W,W,W,W,W,W,D],
+     [D,W,D,W,W,D,W,D],
+     [D,D,D,D,D,D,D,D]],
+
+    # 16: Checkpoint flag top (flag + pole top)
+    [[S,D,D,D,D,S,S,S],   # flag banner (3 tiles wide)
+     [S,D,D,D,D,S,S,S],
+     [S,D,S,S,S,S,S,S],
+     [S,D,S,S,S,S,S,S],
+     [S,D,S,S,S,S,S,S],
+     [S,D,S,S,S,S,S,S],
+     [S,D,S,S,S,S,S,S],
+     [S,D,S,S,S,S,S,S]],
+
+    # 17: Checkpoint flag pole (vertical single-pixel dark pole)
+    [[S,D,S,S,S,S,S,S],
+     [S,D,S,S,S,S,S,S],
+     [S,D,S,S,S,S,S,S],
+     [S,D,S,S,S,S,S,S],
+     [S,D,S,S,S,S,S,S],
+     [S,D,S,S,S,S,S,S],
+     [S,D,S,S,S,S,S,S],
+     [S,D,S,S,S,S,S,S]],
 ]
-assert len(TILES) == 15, f"Expected 15 tiles, got {len(TILES)}"
+assert len(TILES) == 18, f"Expected 18 tiles, got {len(TILES)}"
 
 # ---------------------------------------------------------------------------
 # 32x18 tilemap
@@ -247,16 +277,30 @@ _SKY    = 0
 _CTL,_CTC,_CTR = 1,2,3   # cloud top
 _CBL,_CBC,_CBR = 4,5,6   # cloud bottom
 _FTL,_FTR = 7,8           # foliage top
-_FBL,_FBR = 9,10           # foliage bottom
+_FBL,_FBR = 9,10          # foliage bottom
 _TRK    = 11               # trunk
 _GRASS  = 12
 _DIRT   = 13
 _DEEP   = 14
+_WALL   = 15               # ground block obstacle (1 tile tall, row 9)
+_FLAGTOP = 16              # checkpoint flag top
+_FLAGPOLE = 17             # checkpoint flag pole
 
 MAP_W, MAP_H = 32, 18
 
-# Trees: each entry is (left_col, right_col)
-_TREES = [(6,7), (16,17), (24,25), (29,30)]
+# Trees: each entry is (left_col, right_col) for foliage top at row 7
+_TREES = [(5,6), (14,15), (21,22), (29,30)]
+
+# Gaps in the ground: columns where row 10-13 is sky (player falls through)
+# These must match the gap constants in src/sprite_player.c.
+_GAPS = {9, 10, 19, 20}   # cols 9-10 (world_x 72-87) and 19-20 (world_x 152-167)
+
+# Wall columns: single-tile obstacle at row 9 (player must jump over)
+# These must match the wall constants in src/sprite_player.c.
+_WALLS = {13, 24}  # col 13 (world_x 104), col 24 (world_x 192)
+
+# Checkpoint flag at column 27 (world_x ~216, near the end of the map)
+_CHECKPOINT_COL = 27
 
 def _build_tilemap():
     rows = []
@@ -268,27 +312,64 @@ def _build_tilemap():
             if row >= 14:
                 tile = _DEEP
             elif row >= 11:
-                tile = _DIRT
+                # Gaps: sky tiles instead of dirt
+                tile = _SKY if col in _GAPS else _DIRT
             elif row == 10:
-                tile = _GRASS
+                # Gaps: sky tiles instead of grass
+                tile = _SKY if col in _GAPS else _GRASS
+            elif row == 9:
+                # Wall obstacles at ground level (highest priority)
+                if col in _WALLS:
+                    tile = _WALL
+                elif col == _CHECKPOINT_COL:
+                    tile = _FLAGPOLE
+                else:
+                    # Tree trunks
+                    tile = _SKY
+                    for lc, rc in _TREES:
+                        if col in (lc, rc):
+                            tile = _TRK
+                            break
+            elif row == 8:
+                if col == _CHECKPOINT_COL:
+                    tile = _FLAGPOLE
+                else:
+                    # Tree foliage bottom
+                    tile = _SKY
+                    for lc, rc in _TREES:
+                        if col == lc:  tile = _FBL; break
+                        if col == rc:  tile = _FBR; break
+            elif row == 7:
+                if col == _CHECKPOINT_COL:
+                    tile = _FLAGPOLE
+                else:
+                    # Tree foliage top
+                    tile = _SKY
+                    for lc, rc in _TREES:
+                        if col == lc:  tile = _FTL; break
+                        if col == rc:  tile = _FTR; break
+            elif row == 6:
+                tile = _FLAGTOP if col == _CHECKPOINT_COL else _SKY
             # Cloud 1: rows 2-3, cols 3-5
             elif row == 2 and 3 <= col <= 5:
                 tile = [_CTL,_CTC,_CTR][col-3]
             elif row == 3 and 3 <= col <= 5:
                 tile = [_CBL,_CBC,_CBR][col-3]
-            # Cloud 2: rows 1-2, cols 22-24
-            elif row == 1 and 22 <= col <= 24:
-                tile = [_CTL,_CTC,_CTR][col-22]
-            elif row == 2 and 22 <= col <= 24:
-                tile = [_CBL,_CBC,_CBR][col-22]
-            else:
-                # Trees
-                for lc, rc in _TREES:
-                    if row == 7 and col == lc:   tile = _FTL; break
-                    if row == 7 and col == rc:   tile = _FTR; break
-                    if row == 8 and col == lc:   tile = _FBL; break
-                    if row == 8 and col == rc:   tile = _FBR; break
-                    if row == 9 and col in (lc, rc): tile = _TRK; break
+            # Cloud 2 (smaller): rows 1-2, cols 12-13
+            elif row == 1 and 12 <= col <= 13:
+                tile = [_CTL,_CTR][col-12]
+            elif row == 2 and 12 <= col <= 13:
+                tile = [_CBL,_CBR][col-12]
+            # Cloud 3 (wide): rows 2-3, cols 17-19
+            elif row == 2 and 17 <= col <= 19:
+                tile = [_CTL,_CTC,_CTR][col-17]
+            elif row == 3 and 17 <= col <= 19:
+                tile = [_CBL,_CBC,_CBR][col-17]
+            # Cloud 4: rows 1-2, cols 25-27
+            elif row == 1 and 25 <= col <= 27:
+                tile = [_CTL,_CTC,_CTR][col-25]
+            elif row == 2 and 25 <= col <= 27:
+                tile = [_CBL,_CBC,_CBR][col-25]
 
             r.append(tile)
         rows.append(r)
@@ -299,9 +380,23 @@ assert len(TILEMAP_FLAT) == MAP_W * MAP_H
 
 # ---------------------------------------------------------------------------
 # Per-tile palette attribute map
+# Wall tiles (row 9) use ground palette (0x01) so they look like a solid block.
+# All other sky rows (0-9) use palette 0; ground rows (10-17) use palette 1.
 # ---------------------------------------------------------------------------
-ATTR_MAP = [0x00 if (i // MAP_W) < 10 else 0x01
-            for i in range(MAP_W * MAP_H)]
+def _build_attr_map():
+    attrs = []
+    for i in range(MAP_W * MAP_H):
+        row = i // MAP_W
+        col = i %  MAP_W
+        if row < 10:
+            # Wall obstacle at row 9: use ground palette for visibility
+            attr = 0x01 if (row == 9 and TILEMAP_FLAT[i] == _WALL) else 0x00
+        else:
+            attr = 0x01
+        attrs.append(attr)
+    return attrs
+
+ATTR_MAP = _build_attr_map()
 
 # ---------------------------------------------------------------------------
 # main

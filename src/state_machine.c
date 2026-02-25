@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "states.h"
+#include "state_win.h"
 
 static GameStateID current_state_id;
 static const GameState* current_state_ptr = NULL;
@@ -10,7 +11,8 @@ static const GameState* current_state_ptr = NULL;
 static const GameState* states[] = {
     &state_title,
     &state_gameplay,
-    &state_gameover
+    &state_gameover,
+    &state_win
 };
 
 void switch_state(GameStateID new_state) {
