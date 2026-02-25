@@ -53,3 +53,19 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Build output
+obj/
+*.gb
+*.gbc
+*.ihx
+*.cdb
+*.adb
+*.noi
+*.map
+*.sym
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
