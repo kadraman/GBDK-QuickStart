@@ -184,7 +184,7 @@ def write_background_files(name, tiles, tilemap, palette_colors,
         ]
 
     c_path = os.path.join(out_dir, f'{name}.c')
-    with open(c_path, 'w') as f:
+    with open(c_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(c_lines) + '\n')
     print(f'Written {c_path}')
 
@@ -212,7 +212,7 @@ def write_background_files(name, tiles, tilemap, palette_colors,
     h_lines += ['', '#endif']
 
     h_path = os.path.join(out_dir, f'{name}.h')
-    with open(h_path, 'w') as f:
+    with open(h_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(h_lines) + '\n')
     print(f'Written {h_path}')
 
@@ -251,7 +251,7 @@ def write_font_files(name, tiles, palette_colors, extra_defines=None, out_dir='.
         '};',
     ]
     c_path = os.path.join(out_dir, f'{name}.c')
-    with open(c_path, 'w') as f:
+    with open(c_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(c_lines) + '\n')
     print(f'Written {c_path}')
 
@@ -280,7 +280,7 @@ def write_font_files(name, tiles, palette_colors, extra_defines=None, out_dir='.
         '#endif',
     ]
     h_path = os.path.join(out_dir, f'{name}.h')
-    with open(h_path, 'w') as f:
+    with open(h_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(h_lines) + '\n')
     print(f'Written {h_path}')
 
@@ -319,7 +319,7 @@ def write_sprite_files(name, frames_top, frames_bottom, palette_colors, out_dir=
         '};',
     ]
     c_path = os.path.join(out_dir, f'{name}.c')
-    with open(c_path, 'w') as f:
+    with open(c_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(c_lines) + '\n')
     print(f'Written {c_path}')
 
@@ -343,7 +343,7 @@ def write_sprite_files(name, frames_top, frames_bottom, palette_colors, out_dir=
         '#endif',
     ]
     h_path = os.path.join(out_dir, f'{name}.h')
-    with open(h_path, 'w') as f:
+    with open(h_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(h_lines) + '\n')
     print(f'Written {h_path}')
 
@@ -404,7 +404,7 @@ def write_sprite_files_animated(name, animations, palette_colors,
         '};',
     ]
     c_path = os.path.join(out_dir, f'{name}.c')
-    with open(c_path, 'w') as f:
+    with open(c_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(c_lines) + '\n')
     print(f'Written {c_path}')
 
@@ -436,6 +436,6 @@ def write_sprite_files_animated(name, animations, palette_colors,
         '#endif',
     ]
     h_path = os.path.join(out_dir, f'{name}.h')
-    with open(h_path, 'w') as f:
+    with open(h_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(h_lines) + '\n')
     print(f'Written {h_path}')

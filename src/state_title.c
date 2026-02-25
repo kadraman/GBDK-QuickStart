@@ -19,10 +19,10 @@ static void title_init(void)
     show_prompt   = 1;
 
     /* Load background tilemap and palette attributes in one batch call */
-    set_bkg_tiles(0, 0, BACKGROUND_MAP_WIDTH, BACKGROUND_MAP_HEIGHT,
+    set_bkg_tiles(0, 0, BACKGROUND_MAP_WIDTH, BACKGROUND_MAP_HEIGHT-3,
                   background_map);
     VBK_REG = 1;
-    set_bkg_tiles(0, 0, BACKGROUND_MAP_WIDTH, BACKGROUND_MAP_HEIGHT,
+    set_bkg_tiles(0, 0, BACKGROUND_MAP_WIDTH, BACKGROUND_MAP_HEIGHT-3,
                   background_attr_map);
     VBK_REG = 0;
 
@@ -30,9 +30,9 @@ static void title_init(void)
     SCY_REG = 0;
 
     /* Draw title text */
-    draw_text(4, 4,  "GBC TEMPLATE", FONT_FIRST_TILE);
-    draw_text(3, 5,  "GAME STARTER", FONT_FIRST_TILE);
-    draw_text(3, 8,  "PRESS START",  FONT_FIRST_TILE);
+    draw_text(6, 3,  "GBDK-GBC", FONT_FIRST_TILE);
+    draw_text(1, 4,  "QuickStart Template", FONT_FIRST_TILE);
+    draw_text(4, 16, "PRESS START",  FONT_FIRST_TILE);
 }
 
 static void title_update(void)
@@ -42,9 +42,9 @@ static void title_update(void)
         flash_counter = 0;
         show_prompt ^= 1U;
         if (show_prompt) {
-            draw_text(3, 8, "PRESS START", FONT_FIRST_TILE);
+            draw_text(4, 16, "PRESS START", FONT_FIRST_TILE);
         } else {
-            draw_text(3, 8, "           ", FONT_FIRST_TILE);
+            draw_text(4, 16, "           ", FONT_FIRST_TILE);
         }
     }
 

@@ -110,8 +110,9 @@ static void hud_init(void)
 {
     uint8_t x, row;
 
-    /* Position window at bottom of screen */
-    move_win(0, HUD_WIN_Y);
+     /* Position window at bottom of screen
+         WX register expects value = window_x + 7, so use 7 to align at left */
+     move_win(7U, HUD_WIN_Y);
 
     /* Fill all 4 window rows with HUD background (space tiles + HUD palette) */
     VBK_REG = 0;

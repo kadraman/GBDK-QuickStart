@@ -12,7 +12,7 @@ A complete starter template for **GameBoy Color (GBC)** games, built with [GBDK-
 | SDK | GBDK-2020 (`lcc` / `sdcc`) |
 | Language | C (C99 compatible) |
 | Screens | Title → Gameplay → Game Over |
-| Sprites | 8×16 mode, 4-frame walk cycle |
+| Sprites | 8×16 mode, multi-frame walk cycle |
 | Background | 20×18 tilemap with 2 GBC palettes |
 | Font | 5×7 bitmap font, ASCII 32–127 |
 
@@ -148,13 +148,24 @@ const palette_color_t background_palettes[8] = {
 
 ### VRAM Bank 1 Tile Attributes
 
-GBC uses VRAM Bank 1 to store per-tile attributes (palette index, flip flags, priority):
+VRAM Bank 1 stores the per-tile attribute bytes (palette index, flip flags,
+priority and the VRAM-bank select bit). These attribute bytes live in the
+background attribute map (written with `VBK_REG = 1`) — they are not the
+tile PATTERN data written with `set_bkg_data()`.
+
+Write attribute bytes like this:
 
 ```c
-VBK_REG = 1;  /* Switch to attribute bank */
-set_bkg_tile_xy(x, y, palette_index);  /* 0x00 = palette 0, 0x01 = palette 1, … */
-VBK_REG = 0;  /* Switch back to tile bank */
+VBK_REG = 1; /* switch to attribute bank */
+set_bkg_tile_xy(x, y, attr_byte); /* attr_byte encodes palette/index/flags */
+VBK_REG = 0; /* switch back to tile bank */
 ```
+
+Note: the attribute byte also contains a bit that selects the alternate VRAM
+bank for the tile pattern. If you place tile PATTERN data in VRAM bank 1 but
+only write palette indices (e.g. `0x00`, `0x01`, `0x02`) without setting the
+VRAM-bank bit, the patterns in bank 1 will not be used. Use the attribute
+byte intentionally when you need to select alternate pattern banks.
 
 ---
 
