@@ -1,6 +1,7 @@
-# GBC-Template
+# GBDK QuickStart
 
-A complete starter template for **GameBoy Color (GBC)** games, built with [GBDK-2020](https://github.com/gbdk-2020/gbdk-2020). Includes a state-machine game loop, pre-generated 2bpp tile assets, GBC color palettes, animated sprites, and VS Code tooling.
+This repository contains a QuickStart template for writing **GameBoy Color (GBC)** games, using [GBDK-2020](https://github.com/gbdk-2020/gbdk-2020). 
+It Includes a state-machine game loop, pre-generated 2bpp tile assets, GBC color palettes, animated sprites, and VS Code tooling.
 
 ---
 
@@ -75,13 +76,13 @@ GBC-Template/
 
 ```bash
 make all
-# Output: obj/GBCTemplate.gbc
+# Output: obj/quickstart.gbc
 ```
 
 ### 2. Run in Emulicious
 
 ```bash
-Emulicious obj/GBCTemplate.gbc
+Emulicious obj/quickstart.gbc
 ```
 
 On Windows the Makefile defaults `EMULICIOUS` to `Emulicious.exe`; on Unix-like systems it will prefer a system `Emulicious` binary or fall back to `java -jar Emulicious.jar`. Override with `make EMULICIOUS="java -jar /path/to/Emulicious.jar" run` if required.
