@@ -52,7 +52,7 @@ ALLSRC      = $(SRCSRC) $(RESSRC)
 OBJS        = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCSRC)) \
               $(patsubst $(RESDIR)/%.c,$(OBJDIR)/%.o,$(RESSRC))
 
-PNG_ASSETS  = $(RESDIR)/background.png $(RESDIR)/font.png $(RESDIR)/player.png
+PNG_ASSETS  = $(RESDIR)/background.png $(RESDIR)/font.png $(RESDIR)/player.png $(RESDIR)/enemy.png
 
 .PHONY: all generate convert clean clean-generated run
 
@@ -99,4 +99,4 @@ clean:
 # asset sources in `res/` (background, font, sprite).
 clean-generated:
 	# Remove generated asset sources in res/ (background, font, sprite)
-	rm -f $(RESDIR)/background.* $(RESDIR)/font.* $(RESDIR)/player.*
+	rm -f $(RESDIR)/background.* $(RESDIR)/font.* $(RESDIR)/player.* $(RESDIR)/enemy.*

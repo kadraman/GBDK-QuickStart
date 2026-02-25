@@ -5,6 +5,7 @@
 #include "../res/background.h"
 #include "../res/font.h"
 #include "../res/player.h"
+#include "../res/enemy.h"
 
 /* HUD window palette (dark background, white text) */
 static const palette_color_t hud_palette[4] = {
@@ -40,11 +41,17 @@ void main(void) {
     /* Slot 4: HUD red palette (red text on dark background — lives hearts) */
     set_bkg_palette(4, 1, hud_red_palette);
 
-    /* --- GBC sprite palette (slot 0) --- */
+    /* --- GBC sprite palettes --- */
+    /* Slot 0: player palette */
     set_sprite_palette(0, PLAYER_PALETTE_COUNT, player_palettes);
+    /* Slot 1: enemy palette */
+    set_sprite_palette(1, ENEMY_PALETTE_COUNT, enemy_palettes);
 
     /* --- Load sprite tiles --- */
+    /* Player tiles at slots 0 .. PLAYER_TILE_COUNT-1 */
     set_sprite_data(0, PLAYER_TILE_COUNT, player_tiles);
+    /* Enemy tiles immediately after player tiles */
+    set_sprite_data(PLAYER_TILE_COUNT, ENEMY_TILE_COUNT, enemy_tiles);
 
     /* Use 8x16 sprite mode (two stacked 8x8 OBJ tiles per sprite) */
     SPRITES_8x16;

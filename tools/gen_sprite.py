@@ -73,25 +73,47 @@ def process_definition(defn_path):
     palette     = mod.PALETTE
     pixel_chars = dict(getattr(mod, 'PIXEL_CHARS', {}))
     pixel_chars['.'] = 0   # '.' is always transparent
+    size        = getattr(mod, 'SIZE', '8x16')
 
     animations = mod.ANIMATIONS
 
     out_dir = os.path.join(REPO_ROOT, 'res')
     os.makedirs(out_dir, exist_ok=True)
 
-    # Build a preview PNG: all frames stacked vertically (8 px wide)
+    # Build a preview PNG; width and frame layout depend on sprite size
     pixel_grid = []
-    for anim_frames in animations.values():
-        for top_rows, bot_rows in anim_frames:
-            for row_str in top_rows:
-                pixel_grid.append([pixel_chars.get(c, 0) for c in row_str])
-            for row_str in bot_rows:
-                pixel_grid.append([pixel_chars.get(c, 0) for c in row_str])
-
     n_total_frames = sum(len(v) for v in animations.values())
+
+    if size == '16x16':
+        for anim_frames in animations.values():
+            for l_top, l_bot, r_top, r_bot in anim_frames:
+                for i, row_str in enumerate(l_top):
+                    left  = [pixel_chars.get(c, 0) for c in row_str]
+                    right = [pixel_chars.get(c, 0) for c in r_top[i]]
+                    pixel_grid.append(left + right)
+                for i, row_str in enumerate(l_bot):
+                    left  = [pixel_chars.get(c, 0) for c in row_str]
+                    right = [pixel_chars.get(c, 0) for c in r_bot[i]]
+                    pixel_grid.append(left + right)
+        png_dims = f'16x{n_total_frames * 16}'
+    elif size == '8x8':
+        for anim_frames in animations.values():
+            for (content_rows,) in anim_frames:
+                for row_str in content_rows:
+                    pixel_grid.append([pixel_chars.get(c, 0) for c in row_str])
+        png_dims = f'8x{n_total_frames * 8}'
+    else:  # '8x16'
+        for anim_frames in animations.values():
+            for top_rows, bot_rows in anim_frames:
+                for row_str in top_rows:
+                    pixel_grid.append([pixel_chars.get(c, 0) for c in row_str])
+                for row_str in bot_rows:
+                    pixel_grid.append([pixel_chars.get(c, 0) for c in row_str])
+        png_dims = f'8x{n_total_frames * 16}'
+
     png_path = os.path.join(out_dir, f'{name}.png')
     make_indexed_png(pixel_grid, palette, png_path)
-    print(f'Written {png_path}  (8x{n_total_frames * 16})')
+    print(f'Written {png_path}  ({png_dims})')
 
     write_sprite_files_animated(
         name=name,
@@ -99,6 +121,7 @@ def process_definition(defn_path):
         palette_colors=palette,
         pixel_chars=pixel_chars,
         out_dir=out_dir,
+        size=size,
     )
 
 

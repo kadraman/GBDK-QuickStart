@@ -1,0 +1,65 @@
+#include <gb/gb.h>
+#include <stdint.h>
+#include "sprite.h"
+#include "sprite_manager.h"
+
+static Sprite _pool[SPRITE_MANAGER_MAX];
+
+void sprite_manager_init(void)
+{
+    uint8_t i;
+    for (i = 0U; i < SPRITE_MANAGER_MAX; i++) {
+        _pool[i].active = 0U;
+    }
+}
+
+Sprite* sprite_manager_alloc(uint8_t obj_id,
+                              uint8_t num_objs,
+                              uint8_t width,
+                              uint8_t height,
+                              uint8_t tile_base,
+                              uint8_t tiles_per_frame)
+{
+    uint8_t i;
+    for (i = 0U; i < SPRITE_MANAGER_MAX; i++) {
+        if (!_pool[i].active) {
+            _pool[i].obj_id          = obj_id;
+            _pool[i].num_objs        = num_objs;
+            _pool[i].width           = width;
+            _pool[i].height          = height;
+            _pool[i].tile_base       = tile_base;
+            _pool[i].tiles_per_frame = tiles_per_frame;
+            _pool[i].world_x         = 0U;
+            _pool[i].hw_y            = 0U;
+            _pool[i].anim_frame      = 0U;
+            _pool[i].anim_counter    = 0U;
+            _pool[i].active          = 1U;
+            return &_pool[i];
+        }
+    }
+    return 0;   /* pool full */
+}
+
+void sprite_manager_free(Sprite *s)
+{
+    uint8_t i;
+    if (!s) return;
+    s->active = 0U;
+    for (i = 0U; i < s->num_objs; i++) {
+        move_sprite((uint8_t)(s->obj_id + i), 0U, 0U);
+    }
+}
+
+void sprite_manager_update_hw(const Sprite *s, uint8_t camera_x)
+{
+    uint8_t hw_x;
+    if (!s || !s->active) return;
+    hw_x = (uint8_t)(s->world_x - camera_x + 8U);
+    if (s->num_objs >= 2U) {
+        /* 16x16: two side-by-side 8x16 OBJ slots */
+        move_sprite(s->obj_id, hw_x, s->hw_y);
+        move_sprite((uint8_t)(s->obj_id + 1U), (uint8_t)(hw_x + 8U), s->hw_y);
+    } else {
+        move_sprite(s->obj_id, hw_x, s->hw_y);
+    }
+}

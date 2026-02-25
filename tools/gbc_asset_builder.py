@@ -353,15 +353,23 @@ def write_sprite_files(name, frames_top, frames_bottom, palette_colors, out_dir=
 # ---------------------------------------------------------------------------
 
 def write_sprite_files_animated(name, animations, palette_colors,
-                                  pixel_chars, out_dir='.'):
+                                   pixel_chars, out_dir='.', size='8x16'):
     """Write .c and .h for a sprite with multiple named animations.
 
-    name         : base symbol name, e.g. 'player'.
-    animations   : OrderedDict / dict { anim_name: [(top_rows, bot_rows), ...] }
-                   top_rows / bot_rows are each 8 strings of 8 characters.
+    name          : base symbol name, e.g. 'player'.
+    animations    : dict { anim_name: [frame, ...] }
+                    Frame format depends on *size*:
+                      '8x16' - (top_rows, bot_rows)          2 tiles/frame
+                      '8x8'  - (content_rows,)               2 tiles/frame
+                                 stored as [content, blank] so content appears
+                                 in the top half of the 8x16 hardware slot;
+                                 use OAM Y = GROUND_Y + 8 to land on ground.
+                      '16x16'- (l_top, l_bot, r_top, r_bot)  4 tiles/frame
+                                 two side-by-side 8x16 OBJ slots.
     palette_colors: list of (r,g,b) tuples (length == 4).
-    pixel_chars  : dict mapping character -> colour index (must include '.': 0).
-    out_dir      : output directory.
+    pixel_chars   : dict mapping character -> colour index (must include '.': 0).
+    out_dir       : output directory.
+    size          : sprite size string: '8x8', '8x16', or '16x16'.
     """
     def _parse_tile(string_rows):
         tile = []
@@ -372,17 +380,41 @@ def write_sprite_files_animated(name, animations, palette_colors,
         assert len(tile) == 8, f"Tile must have exactly 8 rows (got {len(tile)})"
         return tile
 
+    _blank_tile = [[0] * 8 for _ in range(8)]
+
     # Flatten all animations; track start tile index per animation
     anim_info  = []   # (anim_name, start_tile_idx, frame_count)
     all_tiles  = []
-    for anim_name, frames in animations.items():
-        start_tile = len(all_tiles)
-        for top_rows, bot_rows in frames:
-            all_tiles.append(_parse_tile(top_rows))
-            all_tiles.append(_parse_tile(bot_rows))
-        anim_info.append((anim_name, start_tile, len(frames)))
+
+    if size == '16x16':
+        tiles_per_frame = 4
+        for anim_name, frames in animations.items():
+            start_tile = len(all_tiles)
+            for l_top, l_bot, r_top, r_bot in frames:
+                all_tiles.append(_parse_tile(l_top))
+                all_tiles.append(_parse_tile(l_bot))
+                all_tiles.append(_parse_tile(r_top))
+                all_tiles.append(_parse_tile(r_bot))
+            anim_info.append((anim_name, start_tile, len(frames)))
+    elif size == '8x8':
+        tiles_per_frame = 2
+        for anim_name, frames in animations.items():
+            start_tile = len(all_tiles)
+            for (content_rows,) in frames:
+                all_tiles.append(_parse_tile(content_rows))
+                all_tiles.append(_blank_tile)
+            anim_info.append((anim_name, start_tile, len(frames)))
+    else:  # '8x16' - default / backward-compatible
+        tiles_per_frame = 2
+        for anim_name, frames in animations.items():
+            start_tile = len(all_tiles)
+            for top_rows, bot_rows in frames:
+                all_tiles.append(_parse_tile(top_rows))
+                all_tiles.append(_parse_tile(bot_rows))
+            anim_info.append((anim_name, start_tile, len(frames)))
 
     tile_count      = len(all_tiles)
+    n_frames_total  = tile_count // tiles_per_frame
     pal_count_total = len(palette_colors)
     tile_bytes      = tiles_to_2bpp_bytes(all_tiles)
     total_tile_b    = len(tile_bytes)
@@ -398,7 +430,7 @@ def write_sprite_files_animated(name, animations, palette_colors,
         _format_palette_array(palette_colors),
         '};',
         '',
-        f'/* Sprite tiles: {tile_count} tiles total ({tile_count//2} frames, 2 tiles/frame) */',
+        f'/* Sprite tiles: {tile_count} tiles total ({n_frames_total} frames, {tiles_per_frame} tiles/frame) */',
         f'const uint8_t {name}_tiles[{total_tile_b}] = {{',
         _format_c_bytes(tile_bytes),
         '};',
@@ -420,7 +452,7 @@ def write_sprite_files_animated(name, animations, palette_colors,
         '',
         f'#define {NAME}_TILE_COUNT      {tile_count}U',
         f'#define {NAME}_PALETTE_COUNT    1U',
-        f'#define {NAME}_TILES_PER_FRAME  2U',
+        f'#define {NAME}_TILES_PER_FRAME  {tiles_per_frame}U',
         '',
     ]
     for anim_name, start_tile, frame_count in anim_info:

@@ -3,9 +3,12 @@
 #include <stdint.h>
 #include "states.h"
 #include "state_gameplay.h"
+#include "sprite.h"
+#include "sprite_manager.h"
 #include "../res/background.h"
 #include "../res/font.h"
 #include "../res/player.h"
+#include "../res/enemy.h"
 
 /* -----------------------------------------------------------------------
  * Constants
@@ -13,12 +16,19 @@
 #define FONT_FIRST_TILE  BACKGROUND_TILE_COUNT
 
 /* Player physics */
-#define GROUND_Y_HW     80U    /* sprite hardware Y when standing on ground    */
+#define GROUND_Y_HW     80U    /* sprite OAM Y when standing on ground         */
 #define JUMP_VY        (-6)    /* initial jump velocity (negative = upward)    */
 #define ANIM_WALK_SPD   8U     /* vblanks between walk animation frames        */
 #define ANIM_IDLE_SPD  20U     /* vblanks between idle animation frames        */
 #define WALK_SPEED      1U     /* world pixels per frame                       */
 #define MIN_WORLD_X     8U     /* minimum player world-X (hardware X-8)        */
+
+/* Enemy */
+#define ENEMY_GROUND_Y_HW  (GROUND_Y_HW + 8U) /* OAM Y placing 8x8 content at ground */
+#define ENEMY_START_X      80U                 /* initial world-X                     */
+#define ENEMY_PATROL_LEFT  10U                 /* left patrol boundary (world-X)      */
+#define ENEMY_PATROL_RIGHT 180U                /* right patrol boundary (world-X)     */
+#define ANIM_ENEMY_SPD     12U                 /* vblanks between enemy anim frames   */
 
 /* Scrolling */
 #define SCROLL_R_LIMIT  100U   /* scroll right when screen-X exceeds this      */
@@ -31,22 +41,28 @@
 #define HUD_PAL          3U    /* BKG palette slot for HUD text (white)        */
 #define HUD_RED_PAL      4U    /* BKG palette slot for hearts (red)            */
 
+/* Collision */
+#define COLLISION_COOLDOWN  60U  /* vblanks of invincibility after taking a hit */
+
 /* -----------------------------------------------------------------------
  * Player state
  * -------------------------------------------------------------------- */
 typedef enum { PSTATE_IDLE, PSTATE_WALK, PSTATE_JUMP } PlayerState;
 
-static uint8_t      player_world_x;   /* world-space pixel X (0..MAX_WORLD_X)  */
-static uint8_t      player_hw_y;      /* hardware sprite Y register             */
-static int8_t       player_vy;        /* vertical velocity (negative = up)      */
+static Sprite      *player_sprite;
+static Sprite      *enemy_sprite;
+
+static int8_t       player_vy;        /* vertical velocity (negative = up)     */
 static uint8_t      player_facing_r;  /* 1 = right, 0 = left                   */
 static PlayerState  player_state;
-static uint8_t      anim_frame;
-static uint8_t      anim_counter;
 static uint8_t      camera_x;         /* SCX_REG value (0..MAX_SCROLL_X)        */
 static uint16_t     score;
 static uint8_t      lives;
 static uint8_t      prev_joy;
+
+static int8_t       enemy_dx;         /* enemy patrol direction (+1 or -1)      */
+static uint8_t      enemy_anim_ctr;   /* enemy animation frame counter          */
+static uint8_t      collision_cooldown; /* frames of post-hit invincibility      */
 
 /* -----------------------------------------------------------------------
  * HUD helpers
@@ -143,17 +159,31 @@ static void hud_init(void)
  * -------------------------------------------------------------------- */
 static void gameplay_init(void)
 {
-    player_world_x  = 20U;
-    player_hw_y     = GROUND_Y_HW;
     player_vy       = 0;
     player_facing_r = 1U;
     player_state    = PSTATE_IDLE;
-    anim_frame      = 0;
-    anim_counter    = 0;
     camera_x        = 0;
     score           = 0;
     lives           = 3;
     prev_joy        = 0;
+    enemy_dx        = 1;
+    enemy_anim_ctr  = 0;
+    collision_cooldown = 0;
+
+    /* Allocate sprites from the manager */
+    sprite_manager_init();
+
+    /* Player: 16x16 -> 2 OBJ slots (OBJ 0 = left half, OBJ 1 = right half) */
+    player_sprite = sprite_manager_alloc(0U, 2U, 8U, 16U, 0U, PLAYER_TILES_PER_FRAME);
+    player_sprite->world_x = 20U;
+    player_sprite->hw_y    = GROUND_Y_HW;
+
+    /* Enemy: 8x8 -> 1 OBJ slot (OBJ 2), tile_base after player tiles */
+    enemy_sprite = sprite_manager_alloc(2U, 1U, 8U, 8U,
+                                        PLAYER_TILE_COUNT,
+                                        ENEMY_TILES_PER_FRAME);
+    enemy_sprite->world_x = ENEMY_START_X;
+    enemy_sprite->hw_y    = ENEMY_GROUND_Y_HW;
 
     /* Load full background tilemap (32x18) in one call */
     set_bkg_tiles(0, 0, BACKGROUND_MAP_WIDTH, BACKGROUND_MAP_HEIGHT,
@@ -167,10 +197,17 @@ static void gameplay_init(void)
     SCX_REG = 0;
     SCY_REG = 0;
 
-    /* Place player sprite */
-    set_sprite_tile(0, PLAYER_ANIM_IDLE_START);
-    set_sprite_prop(0, 0);
-    move_sprite(0, (uint8_t)(player_world_x - camera_x + 8U), player_hw_y);
+    /* Initialise player OBJ tiles and properties */
+    set_sprite_tile(0U, PLAYER_ANIM_IDLE_START);
+    set_sprite_tile(1U, (uint8_t)(PLAYER_ANIM_IDLE_START + 2U));
+    set_sprite_prop(0U, 0U);
+    set_sprite_prop(1U, 0U);
+    sprite_manager_update_hw(player_sprite, camera_x);
+
+    /* Initialise enemy OBJ tile and property (palette slot 1) */
+    set_sprite_tile(2U, (uint8_t)(PLAYER_TILE_COUNT + ENEMY_ANIM_WALK_START));
+    set_sprite_prop(2U, 0x01U);  /* GBC sprite palette 1 */
+    sprite_manager_update_hw(enemy_sprite, camera_x);
 
     hud_init();
     SHOW_WIN;
@@ -190,14 +227,14 @@ static void gameplay_update(void)
     /* --- Horizontal movement --- */
     if (joy & J_RIGHT) {
         player_facing_r = 1U;
-        if (player_world_x < MAX_WORLD_X) {
-            player_world_x = (uint8_t)(player_world_x + WALK_SPEED);
+        if (player_sprite->world_x < MAX_WORLD_X) {
+            player_sprite->world_x = (uint8_t)(player_sprite->world_x + WALK_SPEED);
             moved = 1U;
         }
     } else if (joy & J_LEFT) {
         player_facing_r = 0U;
-        if (player_world_x > MIN_WORLD_X) {
-            player_world_x = (uint8_t)(player_world_x - WALK_SPEED);
+        if (player_sprite->world_x > MIN_WORLD_X) {
+            player_sprite->world_x = (uint8_t)(player_sprite->world_x - WALK_SPEED);
             moved = 1U;
         }
     }
@@ -214,28 +251,28 @@ static void gameplay_update(void)
 
     /* --- Vertical physics --- */
     if (player_state == PSTATE_JUMP) {
-        new_y = (int16_t)player_hw_y + player_vy;
+        new_y = (int16_t)player_sprite->hw_y + player_vy;
         if (new_y < 16) new_y = 16;                 /* top of screen clamp  */
         if (new_y >= (int16_t)GROUND_Y_HW) {
-            new_y        = (int16_t)GROUND_Y_HW;    /* land on ground       */
-            player_vy    = 0;
-            player_state = moved ? PSTATE_WALK : PSTATE_IDLE;
+            new_y            = (int16_t)GROUND_Y_HW;
+            player_vy        = 0;
+            player_state     = moved ? PSTATE_WALK : PSTATE_IDLE;
         } else {
             player_vy++;                             /* gravity              */
         }
-        player_hw_y = (uint8_t)new_y;
+        player_sprite->hw_y = (uint8_t)new_y;
     } else {
         /* Ground-state transition */
         PlayerState next = moved ? PSTATE_WALK : PSTATE_IDLE;
         if (next != player_state) {
-            player_state = next;
-            anim_frame   = 0;
-            anim_counter = 0;
+            player_state               = next;
+            player_sprite->anim_frame   = 0;
+            player_sprite->anim_counter = 0;
         }
     }
 
     /* --- Camera / scroll --- */
-    screen_x = (uint8_t)(player_world_x - camera_x);
+    screen_x = (uint8_t)(player_sprite->world_x - camera_x);
     if (screen_x > SCROLL_R_LIMIT && camera_x < MAX_SCROLL_X) {
         camera_x++;
     } else if (screen_x < SCROLL_L_LIMIT && camera_x > 0) {
@@ -243,12 +280,12 @@ static void gameplay_update(void)
     }
     SCX_REG = camera_x;
 
-    /* --- Animation selection --- */
+    /* --- Player animation selection --- */
     if (player_state == PSTATE_JUMP) {
         /* Frame driven by velocity: 0 = rising, 1 = falling */
-        anim_frame = (player_vy < 0) ? 0U : 1U;
-        tile_idx   = (uint8_t)(PLAYER_ANIM_JUMP_START +
-                                anim_frame * PLAYER_TILES_PER_FRAME);
+        player_sprite->anim_frame = (player_vy < 0) ? 0U : 1U;
+        tile_idx = (uint8_t)(PLAYER_ANIM_JUMP_START +
+                              player_sprite->anim_frame * PLAYER_TILES_PER_FRAME);
     } else {
         if (player_state == PSTATE_WALK) {
             anim_speed  = ANIM_WALK_SPD;
@@ -259,34 +296,87 @@ static void gameplay_update(void)
             anim_start  = PLAYER_ANIM_IDLE_START;
             anim_frames = PLAYER_ANIM_IDLE_FRAMES;
         }
-        anim_counter++;
-        if (anim_counter >= anim_speed) {
-            anim_counter = 0;
-            anim_frame   = (uint8_t)((anim_frame + 1U) % anim_frames);
+        player_sprite->anim_counter++;
+        if (player_sprite->anim_counter >= anim_speed) {
+            player_sprite->anim_counter = 0;
+            player_sprite->anim_frame   =
+                (uint8_t)((player_sprite->anim_frame + 1U) % anim_frames);
         }
-        tile_idx = (uint8_t)(anim_start + anim_frame * PLAYER_TILES_PER_FRAME);
+        tile_idx = (uint8_t)(anim_start +
+                              player_sprite->anim_frame * PLAYER_TILES_PER_FRAME);
     }
-    set_sprite_tile(0, tile_idx);
+
+    /* 16x16 player: OBJ 0 = left half (tile_idx, tile_idx+1)
+     *               OBJ 1 = right half (tile_idx+2, tile_idx+3) */
+    set_sprite_tile(0U, tile_idx);
+    set_sprite_tile(1U, (uint8_t)(tile_idx + 2U));
 
     /* --- Horizontal flip for left-facing --- */
-    prop = get_sprite_prop(0);
+    prop = get_sprite_prop(0U);
     if (player_facing_r) {
         prop = (uint8_t)(prop & ~S_FLIPX);
     } else {
         prop = (uint8_t)(prop | S_FLIPX);
     }
-    set_sprite_prop(0, prop);
+    set_sprite_prop(0U, prop);
 
-    /* --- Move sprite --- */
-    hw_x = (uint8_t)(player_world_x - camera_x + 8U);
-    move_sprite(0, hw_x, player_hw_y);
+    prop = get_sprite_prop(1U);
+    if (player_facing_r) {
+        prop = (uint8_t)(prop & ~S_FLIPX);
+    } else {
+        prop = (uint8_t)(prop | S_FLIPX);
+    }
+    set_sprite_prop(1U, prop);
 
-    prev_joy    = joy;
+    /* --- Move player OBJ slots --- */
+    hw_x = (uint8_t)(player_sprite->world_x - camera_x + 8U);
+    move_sprite(0U, hw_x, player_sprite->hw_y);
+    move_sprite(1U, (uint8_t)(hw_x + 8U), player_sprite->hw_y);
+
+    /* --- Enemy patrol movement --- */
+    enemy_sprite->world_x = (uint8_t)((int16_t)enemy_sprite->world_x + enemy_dx);
+    if (enemy_sprite->world_x >= ENEMY_PATROL_RIGHT) { enemy_dx = -1; }
+    if (enemy_sprite->world_x <= ENEMY_PATROL_LEFT)  { enemy_dx =  1; }
+
+    /* --- Enemy animation --- */
+    enemy_anim_ctr++;
+    if (enemy_anim_ctr >= ANIM_ENEMY_SPD) {
+        enemy_anim_ctr = 0;
+        enemy_sprite->anim_frame =
+            (uint8_t)((enemy_sprite->anim_frame + 1U) % ENEMY_ANIM_WALK_FRAMES);
+    }
+    set_sprite_tile(2U, (uint8_t)(enemy_sprite->tile_base +
+                                   enemy_sprite->anim_frame * ENEMY_TILES_PER_FRAME));
+
+    /* Flip enemy to face direction of travel */
+    prop = get_sprite_prop(2U);
+    if (enemy_dx < 0) {
+        prop = (uint8_t)(prop | S_FLIPX);
+    } else {
+        prop = (uint8_t)(prop & ~S_FLIPX);
+    }
+    set_sprite_prop(2U, prop);
+
+    sprite_manager_update_hw(enemy_sprite, camera_x);
+
+    /* --- Sprite collision: player vs enemy --- */
+    if (collision_cooldown > 0U) {
+        collision_cooldown--;
+    } else if (sprites_collide(player_sprite, enemy_sprite)) {
+        if (lives > 0U) {
+            lives--;
+            hud_update_lives();
+        }
+        collision_cooldown = COLLISION_COOLDOWN;
+    }
+
+    prev_joy = joy;
 }
 
 static void gameplay_cleanup(void)
 {
-    move_sprite(0, 0, 0);   /* hide sprite */
+    if (player_sprite) { sprite_manager_free(player_sprite); player_sprite = 0; }
+    if (enemy_sprite)  { sprite_manager_free(enemy_sprite);  enemy_sprite  = 0; }
     HIDE_WIN;               /* hide HUD window */
     SCX_REG = 0;            /* reset background scroll */
 }
