@@ -9,8 +9,9 @@
 /* -----------------------------------------------------------------------
  * Player physics constants
  * -------------------------------------------------------------------- */
-#define JUMP_VY          (-6)   /* initial jump velocity (negative = up) */
+#define JUMP_VY          (-5)   /* initial jump velocity (negative = up) */
 #define WALK_SPEED         1U   /* world pixels per frame                */
+#define GRAVITY_DELAY      2U   /* frames between gravity steps (1 = every frame) */
 #define MIN_WORLD_X        8U   /* leftmost player world-X               */
 #define MAX_WORLD_X      248U   /* rightmost player world-X              */
 #define SCROLL_R_LIMIT   100U   /* scroll right when screen-X exceeds    */
@@ -49,6 +50,7 @@ static int8_t       _player_vy;
 static uint8_t      _player_facing_r;
 static PlayerState  _player_state;
 static uint8_t      _ground_y;
+static uint8_t      _gravity_delay_ctr;
 
 /* Returns 1 if the player's horizontal extent overlaps a gap */
 static uint8_t _over_gap(void)
@@ -93,6 +95,7 @@ void player_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base)
     _player_facing_r = 1U;
     _player_state    = PSTATE_IDLE;
     _ground_y        = ground_y;
+    _gravity_delay_ctr = 0U;
 
     _player_sprite = sprite_manager_alloc(
         0U, 2U, 8U, 16U, tile_base, PLAYER_TILES_PER_FRAME);
@@ -145,6 +148,7 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x)
     if ((joy_press & J_A) || (joy_press & J_B)) {
         if (_player_state != PSTATE_JUMP) {
             _player_vy    = JUMP_VY;
+            _gravity_delay_ctr = 0U;
             _player_state = PSTATE_JUMP;
             events |= PLAYER_EVENT_JUMPED;
         }
@@ -158,9 +162,15 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x)
             /* Landed on solid ground */
             new_y         = (int16_t)_ground_y;
             _player_vy    = 0;
+            _gravity_delay_ctr = 0U;
             _player_state = moved ? PSTATE_WALK : PSTATE_IDLE;
         } else {
-            _player_vy++;  /* gravity */
+            /* gravity applied every GRAVITY_DELAY frames to slow fall */
+            _gravity_delay_ctr++;
+            if (_gravity_delay_ctr >= GRAVITY_DELAY) {
+                _gravity_delay_ctr = 0U;
+                _player_vy++;  /* gravity */
+            }
         }
         _player_sprite->world_y = (uint8_t)new_y;
 
