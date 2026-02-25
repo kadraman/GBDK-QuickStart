@@ -9,14 +9,31 @@ LIB :=
 CPATH :=
 export INCLUDE LIB CPATH
 
+# Emulicious executable (can be overridden via env or CLI)
+# On Windows prefer the bundled `Emulicious.exe`.
+# On Unix-like systems prefer a system `Emulicious` binary if available,
+# otherwise fall back to `java -jar Emulicious.jar` if that file exists.
+ifeq ($(OS),Windows_NT)
+EMULICIOUS ?= Emulicious.exe
+else
+EMULICIOUS ?= $(shell (command -v Emulicious >/dev/null 2>&1 && echo Emulicious) || \
+				(command -v emulicious >/dev/null 2>&1 && echo emulicious) || \
+				(test -f Emulicious.jar && echo "java -jar Emulicious.jar") || \
+				echo Emulicious)
+endif
+
+# Detect python command: prefer `python3`, fall back to `python`.
+# Allow users to override by setting `PYTHON` in the environment or CLI: `make PYTHON=python3`.
+PYTHON ?= $(shell (command -v python3 >/dev/null 2>&1 && echo python3) || \
+			(command -v python >/dev/null 2>&1 && echo python) || \
+			echo python)
+
 ifndef GBDK_HOME
     GBDK_HOME = $(HOME)/gbdk
 endif
 
 LCC         = $(GBDK_HOME)/bin/lcc
 PNG2ASSET   = $(GBDK_HOME)/bin/png2asset
-
-PYTHON3     = python3
 
 PROJECTNAME = GBCTemplate
 SRCDIR      = src
@@ -37,24 +54,28 @@ OBJS        = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCSRC)) \
 
 PNG_ASSETS  = $(RESDIR)/background.png $(RESDIR)/font.png $(RESDIR)/sprite.png
 
-.PHONY: all generate convert clean
+.PHONY: all generate convert clean clean-generated run
 
 all: prepare $(BINS)
 
 # Generate PNG assets + C/H source files using Python scripts (no GBDK needed).
 # Requires: pip install pillow
 generate:
-	$(PYTHON3) tools/generate_assets.py
+	$(PYTHON) tools/generate_assets.py
 
+# Convert PNG assets to GBDK-compatible C source files using png2asset.
 convert:
 	$(PNG2ASSET) $(RESDIR)/background.png -c $(RESDIR)/background.c -map -bpp 2 -max_palettes 2
 	$(PNG2ASSET) $(RESDIR)/font.png       -c $(RESDIR)/font.c       -map -bpp 2 -max_palettes 1
 	$(PNG2ASSET) $(RESDIR)/sprite.png     -c $(RESDIR)/sprite.c          -bpp 2 -max_palettes 1 -spr8x16 -sw 8 -sh 16
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.c
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
+
+$(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
 	$(LCC) $(LCCFLAGS) -c -o $@ $<
 
-$(OBJDIR)/%.o: $(RESDIR)/%.c
+$(OBJDIR)/%.o: $(RESDIR)/%.c | $(OBJDIR)
 	$(LCC) $(LCCFLAGS) -c -o $@ $<
 
 $(BINS): $(OBJS)
@@ -63,5 +84,19 @@ $(BINS): $(OBJS)
 prepare:
 	mkdir -p $(OBJDIR)
 
+run: $(BINS)
+ifeq ($(OS),Windows_NT)
+	# Use PowerShell Start-Process to reliably launch GUI apps from Make
+	powershell -NoProfile -Command Start-Process -FilePath "$(EMULICIOUS)" -ArgumentList "$(BINS)"
+else
+	$(EMULICIOUS) "$(BINS)" &
+endif
+
 clean:
 	rm -rf $(OBJDIR)
+
+# Remove only build artifacts; use `make clean-generated` to remove generated
+# asset sources in `res/` (background, font, sprite).
+clean-generated:
+	# Remove generated asset sources in res/ (background, font, sprite)
+	rm -f $(RESDIR)/background.* $(RESDIR)/font.* $(RESDIR)/sprite.*

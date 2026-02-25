@@ -24,7 +24,7 @@ A complete starter template for **GameBoy Color (GBC)** games, built with [GBDK-
 |---|---|---|
 | **GBDK-2020** | Compiler & linker (`lcc`) | https://github.com/gbdk-2020/gbdk-2020/releases |
 | **Emulicious** | Emulator for testing | https://emulicious.net |
-| **Python 3 + Pillow** | `make generate` (regenerate PNG/C/H assets) | `pip install pillow` |
+| **Python 3 + Pillow** | `make generate` (regenerate PNG/C/H assets). The Makefile auto-detects `python3` or `python`; override with `make PYTHON=python3` if needed. | `pip install pillow` |
 
 Install GBDK-2020 to `~/gbdk/` (default), or set the `GBDK_HOME` environment variable:
 
@@ -47,9 +47,9 @@ GBC-Template/
 │   ├── state_gameover.c/.h # Game over state
 │   └── utils.c/.h          # Shared draw_text() helper
 ├── res/
-│   ├── background.png      # 160×144 indexed PNG (sky/cloud/grass/ground)
-│   ├── font.png            # 128×48 indexed PNG (96 chars, ASCII 32–127)
-│   ├── sprite.png          # 8×64 indexed PNG (4 animation frames of 8×16)
+│   ├── BACKGROUND.png      # 160×144 indexed PNG (sky/cloud/grass/ground)
+│   ├── FONT.png            # 128×48 indexed PNG (96 chars, ASCII 32–127)
+│   ├── SPRITE.png          # 8×64 indexed PNG (4 animation frames of 8×16)
 │   ├── background.c/.h     # Pre-generated 2bpp tile data + GBC palettes + tilemap
 │   ├── font.c/.h           # Pre-generated 2bpp font tile data
 │   └── sprite.c/.h         # Pre-generated 2bpp sprite tile data + GBC palette
@@ -84,6 +84,8 @@ make all
 Emulicious obj/GBCTemplate.gbc
 ```
 
+On Windows the Makefile defaults `EMULICIOUS` to `Emulicious.exe`; on Unix-like systems it will prefer a system `Emulicious` binary or fall back to `java -jar Emulicious.jar`. Override with `make EMULICIOUS="java -jar /path/to/Emulicious.jar" run` if required.
+
 ### 3. Regenerate assets from Python (no GBDK needed)
 
 If you edit the PNG files or the Python generator scripts, regenerate all C/H
@@ -91,8 +93,13 @@ source files and PNGs with:
 
 ```bash
 make generate
-# or: python3 tools/generate_assets.py
+# or: python tools/generate_assets.py
 ```
+
+Notes:
+- The generators now save PNG assets with an uppercase basename (e.g. `FONT.png`, `BACKGROUND.png`, `SPRITE.png`) so downstream `png2asset` exports keep consistent `#define` names.
+- `make generate` auto-detects the Python command; to force a specific interpreter use `make PYTHON=python3 generate`.
+- The generator scripts (`tools/gen_*.py`) return and print the actual saved path (so you'll see the uppercase filenames in the output).
 
 Individual generators can also be run separately:
 
@@ -114,6 +121,8 @@ make convert
 
 ```bash
 make clean
+# Remove generated PNG/C/H asset files in `res/`:
+make clean-generated
 ```
 
 ### VS Code Tasks

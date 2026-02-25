@@ -6,44 +6,44 @@ Generates the background tileset for the GBC-Template project.
 
 Outputs
 -------
-  res/background.png   – 160x144 indexed PNG (20x18 tiles of 8x8 pixels)
-  res/background.c     – GBDK tile data, palette, and tilemap
-  res/background.h     – Corresponding header file
+  res/background.png   - 160x144 indexed PNG (20x18 tiles of 8x8 pixels)
+  res/background.c     - GBDK tile data, palette, and tilemap
+  res/background.h     - Corresponding header file
 
 The background shows a sky-and-clouds scene in the upper portion and a
 grass-and-ground scene in the lower portion.  Two GBC palettes are used:
-  Palette 0 – sky/cloud colours (loaded for the upper half of the map)
-  Palette 1 – ground colours   (loaded for the lower half of the map)
+  Palette 0 - sky/cloud colours (loaded for the upper half of the map)
+  Palette 1 - ground colours   (loaded for the lower half of the map)
 
 Tile layout (colour indices per palette)
 -----------------------------------------
-  0  Sky solid          – colour 0 (sky blue) everywhere
-  1  Cloud left edge    – lower-left corner filled with colour 1 (white)
-  2  Cloud centre top   – top 2 rows blank, rest colour 1
-  3  Cloud right edge   – lower-right corner filled with colour 1
-  4  Cloud left lower   – top rows colour 1, rest blank
-  5  Cloud centre       – top 6 rows colour 1, rest blank
-  6  Cloud right lower  – top rows colour 1 left 6 cols, rest blank
-  7  Cloud 2 left edge  – lower-right 5 cols colour 1
-  8  Cloud 2 centre     – lower 5 rows colour 1
-  9  Cloud 2 right edge – lower-left 5 cols colour 1
- 10  Cloud 3 left       – top 3 rows colour 1 in right 5 cols
- 11  Cloud 3 centre     – top 5 rows colour 1
- 12  Cloud 3 right      – top 3 rows colour 1 in left 5 cols
- 13  Grass solid        – colour 2 (green) everywhere
- 14  Ground solid       – colour 3 (brown) everywhere
+  0  Sky solid          - colour 0 (sky blue) everywhere
+  1  Cloud left edge    - lower-left corner filled with colour 1 (white)
+  2  Cloud centre top   - top 2 rows blank, rest colour 1
+  3  Cloud right edge   - lower-right corner filled with colour 1
+  4  Cloud left lower   - top rows colour 1, rest blank
+  5  Cloud centre       - top 6 rows colour 1, rest blank
+  6  Cloud right lower  - top rows colour 1 left 6 cols, rest blank
+  7  Cloud 2 left edge  - lower-right 5 cols colour 1
+  8  Cloud 2 centre     - lower 5 rows colour 1
+  9  Cloud 2 right edge - lower-left 5 cols colour 1
+ 10  Cloud 3 left       - top 3 rows colour 1 in right 5 cols
+ 11  Cloud 3 centre     - top 5 rows colour 1
+ 12  Cloud 3 right      - top 3 rows colour 1 in left 5 cols
+ 13  Grass solid        - colour 2 (green) everywhere
+ 14  Ground solid       - colour 3 (brown) everywhere
 
 Tilemap (20 columns x 18 rows)
 -------------------------------
-  Rows 0-1   – all sky (tile 0)
-  Row 2      – cloud 1 at cols 2-4 (tiles 1,2,3); sky elsewhere
-  Row 3      – cloud 1 lower at cols 2-4 (tiles 4,5,6); sky elsewhere
-  Row 4      – cloud 2 at cols 13-15 (tiles 7,8,9); sky elsewhere
-  Row 5      – cloud 2 lower at cols 13-15 (tiles 10,11,12); sky elsewhere
-  Rows 6-9   – all sky
-  Row 10     – alternating grass/sky (tiles 13 and 0, 10 of each)
-  Rows 11-13 – all grass (tile 13)
-  Rows 14-17 – all ground (tile 14)
+  Rows 0-1   - all sky (tile 0)
+  Row 2      - cloud 1 at cols 2-4 (tiles 1,2,3); sky elsewhere
+  Row 3      - cloud 1 lower at cols 2-4 (tiles 4,5,6); sky elsewhere
+  Row 4      - cloud 2 at cols 13-15 (tiles 7,8,9); sky elsewhere
+  Row 5      - cloud 2 lower at cols 13-15 (tiles 10,11,12); sky elsewhere
+  Rows 6-9   - all sky
+  Row 10     - alternating grass/sky (tiles 13 and 0, 10 of each)
+  Rows 11-13 - all grass (tile 13)
+  Rows 14-17 - all ground (tile 14)
 
 Reuse
 -----
@@ -313,8 +313,8 @@ def main():
                     pixel_grid[row * 8 + ty][col * 8 + tx] = tile[ty][tx]
 
     png_path = os.path.join(out_dir, 'background.png')
-    make_indexed_png(pixel_grid, PNG_PALETTE, png_path)
-    print(f'Written {png_path}')
+    png_saved = make_indexed_png(pixel_grid, PNG_PALETTE, png_path)
+    print(f'Written {png_saved}')
 
     write_background_files(
         name='background',

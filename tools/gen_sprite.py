@@ -6,33 +6,33 @@ Generates the animated character sprite for the GBC-Template project.
 
 Outputs
 -------
-  res/sprite.png   – 8x64 indexed PNG (1 tile wide × 8 tiles tall = 4 frames of 8x16)
-  res/sprite.c     – GBDK tile data and sprite palette
-  res/sprite.h     – Corresponding header file
+  res/sprite.png   - 8x64 indexed PNG (1 tile wide x 8 tiles tall = 4 frames of 8x16)
+  res/sprite.c     - GBDK tile data and sprite palette
+  res/sprite.h     - Corresponding header file
 
 The sprite is a small character that uses 8x16 sprite mode (two 8x8 OBJ tiles
 stacked vertically per frame).  Four animation frames produce a simple walk cycle:
 
-  Frame 0 – standing, arms at sides
-  Frame 1 – walk pose: left leg forward
-  Frame 2 – standing, arms raised (slight variation)
-  Frame 3 – walk pose: right leg forward
+  Frame 0 - standing, arms at sides
+  Frame 1 - walk pose: left leg forward
+  Frame 2 - standing, arms raised (slight variation)
+  Frame 3 - walk pose: right leg forward
 
 Each 8x16 frame occupies 2 consecutive tiles in the tile data array.
-The tile index for frame N starts at:  N × SPRITE_TILES_PER_FRAME
+The tile index for frame N starts at:  N x SPRITE_TILES_PER_FRAME
 
 Sprite palette colours (index 0 is transparent on GBC OBJ)
 -----------------------------------------------------------
-  0 – transparent magenta (255,  0, 255)
-  1 – body yellow         (255, 220,  0)
-  2 – outfit blue         ( 50, 100, 200)
-  3 – outline dark        ( 20,  20,  20)
+  0 - transparent magenta (255,  0, 255)
+  1 - body yellow         (255, 220,  0)
+  2 - outfit blue         ( 50, 100, 200)
+  3 - outline dark        ( 20,  20,  20)
 
 Reuse
 -----
 To define a different sprite, edit FRAMES_TOP and FRAMES_BOTTOM below using
 the colour aliases  T=0 (transparent), Y=1, B=2, D=3.  Each frame is a list
-of 8 rows × 8 pixels.  Then run:  python3 tools/gen_sprite.py
+of 8 rows x 8 pixels.  Then run:  python3 tools/gen_sprite.py
 """
 
 import os
@@ -176,8 +176,8 @@ def main():
         pixel_grid.extend(bot)
 
     png_path = os.path.join(out_dir, 'sprite.png')
-    make_indexed_png(pixel_grid, PNG_PALETTE, png_path)
-    print(f'Written {png_path}  ({png_w}x{png_h})')
+    png_saved = make_indexed_png(pixel_grid, PNG_PALETTE, png_path)
+    print(f'Written {png_saved}  ({png_w}x{png_h})')
 
     write_sprite_files(
         name='sprite',

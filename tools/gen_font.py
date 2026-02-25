@@ -6,15 +6,15 @@ Generates the bitmap font tileset for the GBC-Template project.
 
 Outputs
 -------
-  res/font.png   – 128x48 indexed PNG (16 chars wide × 6 rows tall, 8x8 per char)
-  res/font.c     – GBDK tile data and palette
-  res/font.h     – Corresponding header file
+  res/font.png   - 128x48 indexed PNG (16 chars wide x 6 rows tall, 8x8 per char)
+  res/font.c     - GBDK tile data and palette
+  res/font.h     - Corresponding header file
 
-The font covers printable ASCII 32–127 (96 characters) in a compact 5×7 pixel
-stroke on an 8×8 tile grid.  Only colour indices 0 and 1 are used:
+The font covers printable ASCII 32-127 (96 characters) in a compact 5x7 pixel
+stroke on an 8x8 tile grid.  Only colour indices 0 and 1 are used:
 
-  Palette colour 0 – background (sky-matching blue by default)
-  Palette colour 1 – text colour (black by default)
+  Palette colour 0 - background (sky-matching blue by default)
+  Palette colour 1 - text colour (black by default)
 
 The font palette is loaded at GBC background palette slot 2:
   set_bkg_palette(2, FONT_PALETTE_COUNT, font_palettes);
@@ -291,8 +291,8 @@ def main():
                 pixel_grid[ty + r][tx + c] = tile[r][c]
 
     png_path = os.path.join(out_dir, 'font.png')
-    make_indexed_png(pixel_grid, PNG_PALETTE, png_path)
-    print(f'Written {png_path}')
+    png_saved = make_indexed_png(pixel_grid, PNG_PALETTE, png_path)
+    print(f'Written {png_saved}')
 
     write_font_files(
         name='font',
