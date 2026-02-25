@@ -12,7 +12,7 @@ A complete starter template for **GameBoy Color (GBC)** games, built with [GBDK-
 | SDK | GBDK-2020 (`lcc` / `sdcc`) |
 | Language | C (C99 compatible) |
 | Screens | Title → Gameplay → Game Over |
-| Sprites | 8×16 mode, 8-frame walk cycle |
+| Sprites | 8×16 mode, 4-frame walk cycle |
 | Background | 20×18 tilemap with 2 GBC palettes |
 | Font | 5×7 bitmap font, ASCII 32–127 |
 
@@ -47,9 +47,9 @@ GBC-Template/
 │   ├── state_gameover.c/.h # Game over state
 │   └── utils.c/.h          # Shared draw_text() helper
 ├── res/
-│   ├── BACKGROUND.png      # 160×144 indexed PNG (sky/cloud/grass/ground)
-│   ├── FONT.png            # 128×48 indexed PNG (96 chars, ASCII 32–127)
-│   ├── SPRITE.png          # 8×64 indexed PNG (4 animation frames of 8×16)
+│   ├── background.png      # 160×144 indexed PNG (sky/cloud/grass/ground, 32×18 tiles)
+│   ├── font.png            # 128×56 indexed PNG (101 chars, ASCII 32–127 + ♠♣♥♦►)
+│   ├── player.png          # 8×N  indexed PNG (player: idle/walk/jump/die animations)
 │   ├── background.c/.h     # Pre-generated 2bpp tile data + GBC palettes + tilemap
 │   ├── font.c/.h           # Pre-generated 2bpp font tile data
 │   └── sprite.c/.h         # Pre-generated 2bpp sprite tile data + GBC palette
@@ -97,7 +97,6 @@ make generate
 ```
 
 Notes:
-- The generators now save PNG assets with an uppercase basename (e.g. `FONT.png`, `BACKGROUND.png`, `SPRITE.png`) so downstream `png2asset` exports keep consistent `#define` names.
 - `make generate` auto-detects the Python command; to force a specific interpreter use `make PYTHON=python3 generate`.
 - The generator scripts (`tools/gen_*.py`) return and print the actual saved path (so you'll see the uppercase filenames in the output).
 
@@ -229,7 +228,7 @@ generating all PNG and C/H source files from scratch.  No GBDK installation is n
 ### Add more sprites
 
 1. Add 16×16 frames to `sprite.png` (each row of 2 tiles = one 8×16 sprite pair)
-2. Update `SPRITE_FRAME_COUNT` and `SPRITE_TILE_COUNT` in `sprite.h`
+2. Update `PLAYER_ANIM_WALK_FRAMES` in `player.h`
 3. Use `set_sprite_tile()` / `move_sprite()` in your state
 
 ### Add sound

@@ -8,7 +8,7 @@
             "type": "emulicious-debugger",
             "request": "launch",
             "name": "Launch in Emulicious",
-            "program": "obj/GBC-Template.gbc",
+            "program": "obj/GBCTemplate.gbc",
             "port": 58870,
             "stopOnEntry": true
         }

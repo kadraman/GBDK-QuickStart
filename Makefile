@@ -52,7 +52,7 @@ ALLSRC      = $(SRCSRC) $(RESSRC)
 OBJS        = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCSRC)) \
               $(patsubst $(RESDIR)/%.c,$(OBJDIR)/%.o,$(RESSRC))
 
-PNG_ASSETS  = $(RESDIR)/background.png $(RESDIR)/font.png $(RESDIR)/sprite.png
+PNG_ASSETS  = $(RESDIR)/background.png $(RESDIR)/font.png $(RESDIR)/player.png
 
 .PHONY: all generate convert clean clean-generated run
 
@@ -67,7 +67,7 @@ generate:
 convert:
 	$(PNG2ASSET) $(RESDIR)/background.png -c $(RESDIR)/background.c -map -bpp 2 -max_palettes 2
 	$(PNG2ASSET) $(RESDIR)/font.png       -c $(RESDIR)/font.c       -map -bpp 2 -max_palettes 1
-	$(PNG2ASSET) $(RESDIR)/sprite.png     -c $(RESDIR)/sprite.c          -bpp 2 -max_palettes 1 -spr8x16 -sw 8 -sh 16
+	$(PNG2ASSET) $(RESDIR)/player.png     -c $(RESDIR)/player.c          -bpp 2 -max_palettes 1 -spr8x16 -sw 8 -sh 16
 
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
@@ -99,4 +99,4 @@ clean:
 # asset sources in `res/` (background, font, sprite).
 clean-generated:
 	# Remove generated asset sources in res/ (background, font, sprite)
-	rm -f $(RESDIR)/background.* $(RESDIR)/font.* $(RESDIR)/sprite.*
+	rm -f $(RESDIR)/background.* $(RESDIR)/font.* $(RESDIR)/player.*

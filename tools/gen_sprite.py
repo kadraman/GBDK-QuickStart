@@ -2,190 +2,135 @@
 """
 gen_sprite.py
 =============
-Generates the animated character sprite for the GBC-Template project.
+Auto-discovers sprite definitions in res/sprites/*/definition.py and
+generates .c/.h source files plus a preview PNG for each sprite.
 
-Outputs
--------
-  res/sprite.png   - 8x64 indexed PNG (1 tile wide x 8 tiles tall = 4 frames of 8x16)
-  res/sprite.c     - GBDK tile data and sprite palette
-  res/sprite.h     - Corresponding header file
-
-The sprite is a small character that uses 8x16 sprite mode (two 8x8 OBJ tiles
-stacked vertically per frame).  Four animation frames produce a simple walk cycle:
-
-  Frame 0 - standing, arms at sides
-  Frame 1 - walk pose: left leg forward
-  Frame 2 - standing, arms raised (slight variation)
-  Frame 3 - walk pose: right leg forward
-
-Each 8x16 frame occupies 2 consecutive tiles in the tile data array.
-The tile index for frame N starts at:  N x SPRITE_TILES_PER_FRAME
-
-Sprite palette colours (index 0 is transparent on GBC OBJ)
------------------------------------------------------------
-  0 - transparent magenta (255,  0, 255)
-  1 - body yellow         (255, 220,  0)
-  2 - outfit blue         ( 50, 100, 200)
-  3 - outline dark        ( 20,  20,  20)
-
-Reuse
+Usage
 -----
-To define a different sprite, edit FRAMES_TOP and FRAMES_BOTTOM below using
-the colour aliases  T=0 (transparent), Y=1, B=2, D=3.  Each frame is a list
-of 8 rows x 8 pixels.  Then run:  python3 tools/gen_sprite.py
+  python3 tools/gen_sprite.py                         # process all sprites
+  python3 tools/gen_sprite.py res/sprites/player/definition.py  # one sprite
+
+Adding a new sprite
+-------------------
+1. Create a directory under res/sprites/, e.g. res/sprites/enemy/
+2. Add a definition.py with the following module-level names:
+     NAME         – str, base symbol name (e.g. 'enemy')
+     PALETTE      – list of 4 (R,G,B) tuples; index 0 = transparent
+     PIXEL_CHARS  – dict mapping char -> colour index; '.' is always 0
+     ANIMATIONS   – dict { anim_name: [(top_rows, bot_rows), ...] }
+                    top_rows / bot_rows: list of 8 strings of 8 chars
+3. Run  make generate  (or  python3 tools/gen_sprite.py)
+
+Output
+------
+  res/<name>.png   – preview PNG (8 px wide × N*16 px tall, all frames)
+  res/<name>.c     – GBDK 2bpp tile data + palette
+  res/<name>.h     – header with PLAYER_ANIM_<ANIM>_START / _FRAMES defines
+
+Requirements:  pip install pillow
 """
 
+import importlib.util
 import os
 import sys
 
 TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(TOOLS_DIR)
+REPO_ROOT  = os.path.dirname(TOOLS_DIR)
 sys.path.insert(0, TOOLS_DIR)
 
-from gbc_asset_builder import make_indexed_png, write_sprite_files
+from gbc_asset_builder import make_indexed_png, write_sprite_files_animated
+
 
 # ---------------------------------------------------------------------------
-# Sprite palette
-# ---------------------------------------------------------------------------
-PALETTE_COLORS = [
-    (255,   0, 255),   # 0 – transparent
-    (255, 220,   0),   # 1 – yellow (head/body)
-    ( 50, 100, 200),   # 2 – blue (outfit)
-    ( 20,  20,  20),   # 3 – dark outline
-]
-
-PNG_PALETTE = PALETTE_COLORS
-
-# Colour aliases for readability
-T = 0   # transparent
-Y = 1   # yellow
-B = 2   # blue
-D = 3   # dark outline
-
-# ---------------------------------------------------------------------------
-# Frame definitions – 8x16 pixels per frame, split into top (rows 0-7) and
-# bottom (rows 8-15) halves.  Each is a list of 8 rows of 8 colour indices.
+# Helpers
 # ---------------------------------------------------------------------------
 
-# ---- Frame 0: standing neutral ----
-_F0_TOP = [
-    [T, T, D, D, D, D, T, T],   # head outline top
-    [T, D, Y, Y, Y, Y, D, T],   # head left/right
-    [T, D, Y, Y, Y, Y, D, T],   # head middle
-    [T, T, D, Y, Y, D, T, T],   # head chin
-    [T, T, B, B, B, B, T, T],   # body top
-    [T, B, B, B, B, B, B, T],   # body wide
-    [T, B, B, B, B, B, B, T],   # body wide
-    [T, T, D, D, D, D, T, T],   # body bottom
-]
-_F0_BOT = [
-    [T, T, B, T, T, B, T, T],   # legs upper
-    [T, T, B, T, T, B, T, T],
-    [T, T, B, T, T, B, T, T],
-    [T, T, B, T, T, B, T, T],
-    [T, T, D, T, T, D, T, T],   # feet
-    [T, T, D, T, T, D, T, T],
-    [T, T, T, T, T, T, T, T],
-    [T, T, T, T, T, T, T, T],
-]
+def _load_definition(path):
+    """Import a definition.py file as a Python module."""
+    spec = importlib.util.spec_from_file_location('sprite_definition', path)
+    mod  = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
-# ---- Frame 1: walk – left leg forward ----
-_F1_TOP = [
-    [T, T, D, D, D, D, T, T],
-    [T, D, Y, Y, Y, Y, D, T],
-    [T, D, Y, Y, Y, Y, D, T],
-    [T, T, D, Y, Y, D, T, T],
-    [T, T, B, B, B, B, T, T],
-    [T, B, B, B, B, B, B, T],
-    [T, B, B, B, B, B, B, T],
-    [T, T, D, D, D, D, T, T],
-]
-_F1_BOT = [
-    [T, D, B, T, T, B, T, T],   # left leg slightly out
-    [T, D, T, T, T, B, T, T],
-    [T, D, T, T, T, B, T, T],
-    [D, T, T, T, T, D, T, T],
-    [D, T, T, T, T, D, T, T],
-    [D, D, T, T, T, T, T, T],
-    [T, T, T, T, T, T, T, T],
-    [T, T, T, T, T, T, T, T],
-]
 
-# ---- Frame 2: standing, arms raised ----
-_F2_TOP = [
-    [T, T, D, D, D, D, T, T],
-    [T, D, Y, Y, Y, Y, D, T],
-    [T, D, Y, Y, Y, Y, D, T],
-    [T, T, D, Y, Y, D, T, T],
-    [D, T, B, B, B, B, T, D],   # arms out
-    [B, B, B, B, B, B, B, B],
-    [T, B, B, B, B, B, B, T],
-    [T, T, D, D, D, D, T, T],
-]
-_F2_BOT = [
-    [T, T, B, T, T, B, T, T],
-    [T, T, B, T, T, B, T, T],
-    [T, T, B, T, T, B, T, T],
-    [T, T, B, T, T, B, T, T],
-    [T, T, D, T, T, D, T, T],
-    [T, T, D, T, T, D, T, T],
-    [T, T, T, T, T, T, T, T],
-    [T, T, T, T, T, T, T, T],
-]
+def _parse_tile(string_rows, pixel_chars):
+    tile = []
+    for row_str in string_rows:
+        row = [pixel_chars.get(c, 0) for c in row_str]
+        assert len(row) == 8, \
+            f"Row '{row_str}' must be exactly 8 chars (got {len(row)})"
+        tile.append(row)
+    assert len(tile) == 8, \
+        f"Tile half must have exactly 8 rows (got {len(tile)})"
+    return tile
 
-# ---- Frame 3: walk – right leg forward ----
-_F3_TOP = [
-    [T, T, D, D, D, D, T, T],
-    [T, D, Y, Y, Y, Y, D, T],
-    [T, D, Y, Y, Y, Y, D, T],
-    [T, T, D, Y, Y, D, T, T],
-    [T, T, B, B, B, B, T, T],
-    [T, B, B, B, B, B, B, T],
-    [T, B, B, B, B, B, B, T],
-    [T, T, D, D, D, D, T, T],
-]
-_F3_BOT = [
-    [T, T, B, T, T, B, D, T],   # right leg slightly out
-    [T, T, B, T, T, T, D, T],
-    [T, T, B, T, T, T, D, T],
-    [T, T, D, T, T, T, T, D],
-    [T, T, D, T, T, T, T, D],
-    [T, T, T, T, T, T, D, D],
-    [T, T, T, T, T, T, T, T],
-    [T, T, T, T, T, T, T, T],
-]
 
-FRAMES_TOP    = [_F0_TOP, _F1_TOP, _F2_TOP, _F3_TOP]
-FRAMES_BOTTOM = [_F0_BOT, _F1_BOT, _F2_BOT, _F3_BOT]
+def process_definition(defn_path):
+    """Generate .png, .c, and .h for one sprite definition file."""
+    mod = _load_definition(defn_path)
+
+    name        = mod.NAME
+    palette     = mod.PALETTE
+    pixel_chars = dict(getattr(mod, 'PIXEL_CHARS', {}))
+    pixel_chars['.'] = 0   # '.' is always transparent
+
+    animations = mod.ANIMATIONS
+
+    out_dir = os.path.join(REPO_ROOT, 'res')
+    os.makedirs(out_dir, exist_ok=True)
+
+    # Build a preview PNG: all frames stacked vertically (8 px wide)
+    pixel_grid = []
+    for anim_frames in animations.values():
+        for top_rows, bot_rows in anim_frames:
+            for row_str in top_rows:
+                pixel_grid.append([pixel_chars.get(c, 0) for c in row_str])
+            for row_str in bot_rows:
+                pixel_grid.append([pixel_chars.get(c, 0) for c in row_str])
+
+    n_total_frames = sum(len(v) for v in animations.values())
+    png_path = os.path.join(out_dir, f'{name}.png')
+    make_indexed_png(pixel_grid, palette, png_path)
+    print(f'Written {png_path}  (8x{n_total_frames * 16})')
+
+    write_sprite_files_animated(
+        name=name,
+        animations=animations,
+        palette_colors=palette,
+        pixel_chars=pixel_chars,
+        out_dir=out_dir,
+    )
 
 
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
+
 def main():
-    out_dir = os.path.join(REPO_ROOT, 'res')
-    os.makedirs(out_dir, exist_ok=True)
+    # Allow overriding from command line: python3 gen_sprite.py path/to/def.py
+    if len(sys.argv) > 1:
+        for defn_path in sys.argv[1:]:
+            print(f'=== Processing {defn_path} ===')
+            process_definition(os.path.abspath(defn_path))
+        return
 
-    # Build 8x64 PNG: frames stacked vertically (top half then bottom half)
-    frame_count = len(FRAMES_TOP)
-    png_h = frame_count * 16   # 4 frames × 16 rows = 64
-    png_w = 8
-    pixel_grid = []
-    for top, bot in zip(FRAMES_TOP, FRAMES_BOTTOM):
-        pixel_grid.extend(top)
-        pixel_grid.extend(bot)
+    sprites_dir = os.path.join(REPO_ROOT, 'res', 'sprites')
+    if not os.path.isdir(sprites_dir):
+        print(f'No sprites directory at {sprites_dir} – nothing to do.')
+        return
 
-    png_path = os.path.join(out_dir, 'sprite.png')
-    png_saved = make_indexed_png(pixel_grid, PNG_PALETTE, png_path)
-    print(f'Written {png_saved}  ({png_w}x{png_h})')
+    found = 0
+    for entry in sorted(os.listdir(sprites_dir)):
+        defn_path = os.path.join(sprites_dir, entry, 'definition.py')
+        if os.path.isfile(defn_path):
+            print(f'=== Processing sprite: {entry} ===')
+            process_definition(defn_path)
+            found += 1
 
-    write_sprite_files(
-        name='sprite',
-        frames_top=FRAMES_TOP,
-        frames_bottom=FRAMES_BOTTOM,
-        palette_colors=PALETTE_COLORS,
-        out_dir=out_dir,
-    )
+    if found == 0:
+        print('No sprite definitions found in res/sprites/')
+    else:
+        print(f'\nProcessed {found} sprite(s).')
 
 
 if __name__ == '__main__':

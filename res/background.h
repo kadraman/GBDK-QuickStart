@@ -7,11 +7,12 @@
 
 #define BACKGROUND_TILE_COUNT    15U
 #define BACKGROUND_PALETTE_COUNT 2U
-#define BACKGROUND_MAP_WIDTH     20U
+#define BACKGROUND_MAP_WIDTH     32U
 #define BACKGROUND_MAP_HEIGHT    18U
 
 extern const palette_color_t background_palettes[8];
 extern const uint8_t background_tiles[240];
-extern const uint8_t background_map[360];
+extern const uint8_t background_map[576];
+extern const uint8_t background_attr_map[576];
 
 #endif

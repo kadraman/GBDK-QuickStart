@@ -3,30 +3,17 @@ gbc_asset_builder.py
 ====================
 Reusable helper library for generating Game Boy Color (GBC) tile assets.
 
-It provides functions to:
-  - Convert pixel arrays to GBDK 2bpp tile byte format
-  - Read 8x8 tiles from an indexed PIL Image
-  - Write GBDK-compatible .c and .h source files for backgrounds, fonts,
-    and sprites
-  - Create indexed-colour PNG files from pixel arrays
+Provides:
+  - 2bpp conversion (pixels_to_2bpp, tiles_to_2bpp_bytes)
+  - PNG I/O (make_indexed_png, png_to_tiles)
+  - .c/.h writers for backgrounds, fonts, and sprites
+    (write_background_files, write_font_files,
+     write_sprite_files, write_sprite_files_animated)
 
-Typical usage
--------------
-Import this module from a generator script:
-
-    from gbc_asset_builder import (
-        pixels_to_2bpp, tiles_to_2bpp_bytes, png_to_tiles,
-        make_indexed_png,
-        write_background_files, write_font_files, write_sprite_files,
-    )
-
-Requirements
-------------
-    pip install pillow
+Requirements:  pip install pillow
 """
 
 import os
-import textwrap
 
 try:
     from PIL import Image
@@ -41,27 +28,12 @@ except ImportError:
 def pixels_to_2bpp(rows_8x8):
     """Convert an 8x8 pixel tile to 16 bytes of GBDK 2bpp tile data.
 
-    Parameters
-    ----------
-    rows_8x8 : list of 8 lists, each containing 8 int pixel values (0-3).
-        Pixel (col 0) is the leftmost pixel; colour index 0-3 maps to
-        the four palette entries for that tile.
-
-    Returns
-    -------
-    list of 16 int bytes ready to be written into a C array.
-
-    GBDK 2bpp format
-    ~~~~~~~~~~~~~~~~
-    Each of the 8 pixel rows produces two bytes:
-      - Low-plane byte:  bit N is set when pixel N's colour index has bit 0 set
-      - High-plane byte: bit N is set when pixel N's colour index has bit 1 set
-    Bit 7 of each byte corresponds to the leftmost (col 0) pixel.
+    rows_8x8 : list of 8 lists of 8 int colour indices (0-3).
+    Bit 7 of each byte = leftmost pixel (col 0).
     """
     result = []
     for row in rows_8x8:
-        low_byte = 0
-        high_byte = 0
+        low_byte = high_byte = 0
         for bit_pos, color in enumerate(row):
             mask = 0x80 >> bit_pos
             if color & 1:
@@ -74,16 +46,7 @@ def pixels_to_2bpp(rows_8x8):
 
 
 def tiles_to_2bpp_bytes(tiles):
-    """Convert a list of 8x8 pixel tiles to a flat list of 2bpp bytes.
-
-    Parameters
-    ----------
-    tiles : list of tiles, where each tile is a list of 8 rows of 8 ints.
-
-    Returns
-    -------
-    list of ints (16 bytes × number of tiles).
-    """
+    """Flatten a list of 8x8 pixel tiles into 2bpp bytes (16 bytes per tile)."""
     out = []
     for tile in tiles:
         out.extend(pixels_to_2bpp(tile))
@@ -95,14 +58,11 @@ def tiles_to_2bpp_bytes(tiles):
 # ---------------------------------------------------------------------------
 
 def make_indexed_png(pixel_grid, palette_rgb, output_path):
-    """Create an indexed-colour PNG from a 2-D pixel array.
+    """Write an indexed-colour PNG from a 2-D pixel array.
 
-    Parameters
-    ----------
-    pixel_grid : list of rows, each row is a list of int colour indices.
-        All values must be in [0, len(palette_rgb)-1].
+    pixel_grid  : list of rows, each row is a list of int colour indices.
     palette_rgb : list of (R, G, B) tuples (up to 256 entries).
-    output_path : str - destination file path.
+    output_path : destination file path (saved exactly as given).
     """
     height = len(pixel_grid)
     width  = len(pixel_grid[0])
@@ -110,35 +70,20 @@ def make_indexed_png(pixel_grid, palette_rgb, output_path):
     flat_pal = []
     for r, g, b in palette_rgb:
         flat_pal.extend([r, g, b])
-    # Pad palette to 256 entries
     flat_pal += [0] * (768 - len(flat_pal))
     img.putpalette(flat_pal)
     pixels = img.load()
     for y, row in enumerate(pixel_grid):
         for x, val in enumerate(row):
             pixels[x, y] = val
-    # Ensure the output filename uses an uppercase basename (e.g. FONT.png)
-    out_dir, out_file = os.path.split(output_path)
-    name, ext = os.path.splitext(out_file)
-    out_file_up = name.upper() + ext
-    output_path_up = os.path.join(out_dir, out_file_up)
-    img.save(output_path_up)
-    return output_path_up
+    img.save(output_path)
 
 
 def png_to_tiles(png_path):
-    """Load an indexed PNG and extract 8x8 tile pixel data.
+    """Load an indexed PNG and extract 8x8 tile pixel data (row-major order).
 
-    Tiles are read in row-major order: left-to-right across the image width,
-    then top-to-bottom.  The image dimensions must be multiples of 8.
-
-    Parameters
-    ----------
-    png_path : str - path to an indexed ('P' mode) PNG.
-
-    Returns
-    -------
-    list of tiles; each tile is a list of 8 rows of 8 pixel-index ints.
+    Image dimensions must be multiples of 8.
+    Returns a list of tiles; each tile is 8 rows of 8 colour-index ints.
     """
     img = Image.open(png_path)
     if img.mode != 'P':
@@ -162,7 +107,7 @@ def png_to_tiles(png_path):
 # ---------------------------------------------------------------------------
 
 def _format_c_bytes(data, bytes_per_line=16):
-    """Format a list of ints as comma-separated C hex literals, 16 per line."""
+    """Format ints as comma-separated C hex literals, bytes_per_line per line."""
     lines = []
     for i in range(0, len(data), bytes_per_line):
         chunk = data[i:i + bytes_per_line]
@@ -172,18 +117,10 @@ def _format_c_bytes(data, bytes_per_line=16):
 
 
 def _rgb8_literal(r, g, b):
-    """Return GBDK RGB8() macro call string for an (r,g,b) tuple."""
     return f'RGB8({r:3d},{g:3d},{b:3d})'
 
 
 def _format_palette_array(palette_rows, colors_per_row=4):
-    """Format a flat list of (r,g,b) tuples as a palette_color_t initialiser.
-
-    Parameters
-    ----------
-    palette_rows : list of (r,g,b) tuples - all palette colours in order.
-    colors_per_row : int - how many RGB8() entries to place per source line.
-    """
     lines = []
     for i in range(0, len(palette_rows), colors_per_row):
         chunk = palette_rows[i:i + colors_per_row]
@@ -197,32 +134,30 @@ def _format_palette_array(palette_rows, colors_per_row=4):
 # ---------------------------------------------------------------------------
 
 def write_background_files(name, tiles, tilemap, palette_colors,
-                            map_width, map_height, out_dir='.'):
+                            map_width, map_height, out_dir='.', attr_map=None):
     """Write background .c and .h files.
 
-    Parameters
-    ----------
-    name : str - base name (e.g. 'background'); used for filenames and symbols.
-    tiles : list of 8x8 pixel tiles (list of list of list of int).
-    tilemap : list of int tile indices, length == map_width * map_height.
-    palette_colors : list of (r,g,b) tuples, length == n_palettes * 4.
-    map_width, map_height : int - tilemap dimensions in tiles.
-    out_dir : str - output directory (default: current directory).
+    name           : base name, e.g. 'background'.
+    tiles          : list of 8x8 pixel tiles.
+    tilemap        : flat list of tile indices (map_width * map_height).
+    palette_colors : (r,g,b) tuples, length == n_palettes * 4.
+    map_width/height : tilemap dimensions in tiles.
+    attr_map       : optional flat list of per-tile palette attribute bytes.
+                     When provided, exported as <name>_attr_map[].
     """
-    tile_count   = len(tiles)
-    palette_count = len(palette_colors) // 4
-    tile_bytes   = tiles_to_2bpp_bytes(tiles)
-    total_tile_b = len(tile_bytes)
-    total_map_b  = len(tilemap)
+    tile_count      = len(tiles)
+    palette_count   = len(palette_colors) // 4
+    tile_bytes      = tiles_to_2bpp_bytes(tiles)
+    total_tile_b    = len(tile_bytes)
+    total_map_b     = len(tilemap)
     pal_count_total = len(palette_colors)
     NAME = name.upper()
 
-    # --- .c file ---
     c_lines = [
         f'/* Auto-generated by tools/gen_{name}.py - edit that script to change. */',
         f'#include "{name}.h"',
         '',
-        f'/* GBC background palettes ({palette_count} palette{"s" if palette_count != 1 else ""} x 4 colors each) */',
+        f'/* GBC background palettes ({palette_count} palette{"s" if palette_count!=1 else ""} x 4 colors each) */',
         f'const palette_color_t {name}_palettes[{pal_count_total}] = {{',
         _format_palette_array(palette_colors),
         '};',
@@ -237,12 +172,22 @@ def write_background_files(name, tiles, tilemap, palette_colors,
         _format_c_bytes(tilemap),
         '};',
     ]
+    if attr_map is not None:
+        n_attr = len(attr_map)
+        c_lines += [
+            '',
+            f'/* Per-tile palette attribute map ({map_width}x{map_height} = {n_attr} bytes).',
+            f'   Each byte is the GBC VRAM bank-1 attribute: 0x00=sky palette, 0x01=ground palette. */',
+            f'const uint8_t {name}_attr_map[{n_attr}] = {{',
+            _format_c_bytes(attr_map),
+            '};',
+        ]
+
     c_path = os.path.join(out_dir, f'{name}.c')
     with open(c_path, 'w') as f:
         f.write('\n'.join(c_lines) + '\n')
     print(f'Written {c_path}')
 
-    # --- .h file ---
     h_guard = f'{NAME}_H'
     h_lines = [
         f'/* Auto-generated by tools/gen_{name}.py - edit that script to change. */',
@@ -260,9 +205,12 @@ def write_background_files(name, tiles, tilemap, palette_colors,
         f'extern const palette_color_t {name}_palettes[{pal_count_total}];',
         f'extern const uint8_t {name}_tiles[{total_tile_b}];',
         f'extern const uint8_t {name}_map[{total_map_b}];',
-        '',
-        f'#endif',
     ]
+    if attr_map is not None:
+        n_attr = len(attr_map)
+        h_lines.append(f'extern const uint8_t {name}_attr_map[{n_attr}];')
+    h_lines += ['', '#endif']
+
     h_path = os.path.join(out_dir, f'{name}.h')
     with open(h_path, 'w') as f:
         f.write('\n'.join(h_lines) + '\n')
@@ -273,27 +221,23 @@ def write_background_files(name, tiles, tilemap, palette_colors,
 # Font file writers
 # ---------------------------------------------------------------------------
 
-def write_font_files(name, tiles, palette_colors, out_dir='.'):
+def write_font_files(name, tiles, palette_colors, extra_defines=None, out_dir='.'):
     """Write font .c and .h files.
 
-    Parameters
-    ----------
-    name : str - base name (e.g. 'font').
-    tiles : list of 8x8 pixel tiles (96 tiles for ASCII 32-127).
-    palette_colors : list of (r,g,b) tuples, length == 4.
-    out_dir : str - output directory.
+    extra_defines : optional list of (define_name, value, comment) tuples
+                    appended to the .h file after FONT_TILE_COUNT.
     """
-    tile_count   = len(tiles)
-    palette_count = len(palette_colors) // 4
-    tile_bytes   = tiles_to_2bpp_bytes(tiles)
-    total_tile_b = len(tile_bytes)
+    tile_count      = len(tiles)
+    palette_count   = len(palette_colors) // 4
+    tile_bytes      = tiles_to_2bpp_bytes(tiles)
+    total_tile_b    = len(tile_bytes)
     pal_count_total = len(palette_colors)
     NAME = name.upper()
 
     c_lines = [
         f'/* Auto-generated by tools/gen_{name}.py - edit that script to change. */',
         f'/* Loaded at GBC background palette slot 2 via set_bkg_palette(2, ...). */',
-        f'/* Color 0 = background color, Color 1 = text color. */',
+        f'/* Color 0 = background, Color 1 = text. */',
         f'#include "{name}.h"',
         '',
         f'/* GBC font palette (1 palette x 4 colors) */',
@@ -301,7 +245,7 @@ def write_font_files(name, tiles, palette_colors, out_dir='.'):
         _format_palette_array(palette_colors),
         '};',
         '',
-        f'/* Font tile data ({tile_count} tiles for ASCII 32-127, 16 bytes each) */',
+        f'/* Font tile data ({tile_count} tiles, 16 bytes each) */',
         f'const uint8_t {name}_tiles[{total_tile_b}] = {{',
         _format_c_bytes(tile_bytes),
         '};',
@@ -322,11 +266,18 @@ def write_font_files(name, tiles, palette_colors, out_dir='.'):
         '',
         f'#define {NAME}_TILE_COUNT    {tile_count}U',
         f'#define {NAME}_PALETTE_COUNT {palette_count}U',
+    ]
+    if extra_defines:
+        h_lines.append('')
+        for def_name, def_val, def_comment in extra_defines:
+            comment = f'  /* {def_comment} */' if def_comment else ''
+            h_lines.append(f'#define {def_name.upper()}  {def_val}U{comment}')
+    h_lines += [
         '',
         f'extern const palette_color_t {name}_palettes[{pal_count_total}];',
         f'extern const uint8_t {name}_tiles[{total_tile_b}];',
         '',
-        f'#endif',
+        '#endif',
     ]
     h_path = os.path.join(out_dir, f'{name}.h')
     with open(h_path, 'w') as f:
@@ -335,38 +286,21 @@ def write_font_files(name, tiles, palette_colors, out_dir='.'):
 
 
 # ---------------------------------------------------------------------------
-# Sprite file writers
+# Sprite file writers (simple: single-animation, top+bottom frames)
 # ---------------------------------------------------------------------------
 
-def write_sprite_files(name, frames_top, frames_bottom, palette_colors,
-                        out_dir='.'):
-    """Write sprite .c and .h files for 8x16 sprite mode.
-
-    Each animation frame consists of two 8x8 tiles (top half and bottom half).
-    Tiles are interleaved: [frame0_top, frame0_bottom, frame1_top, ...].
-
-    Parameters
-    ----------
-    name : str - base name (e.g. 'sprite').
-    frames_top : list of 8x8 pixel tiles, one per animation frame (top halves).
-    frames_bottom : list of 8x8 pixel tiles, one per animation frame (bottom halves).
-    palette_colors : list of (r,g,b) tuples (length == 4).
-        Color index 0 is treated as transparent on GBC sprites.
-    out_dir : str - output directory.
-    """
-    assert len(frames_top) == len(frames_bottom), \
-        "frames_top and frames_bottom must have the same length"
-    frame_count = len(frames_top)
+def write_sprite_files(name, frames_top, frames_bottom, palette_colors, out_dir='.'):
+    """Write sprite .c and .h for a single walk-cycle in 8x16 sprite mode."""
+    assert len(frames_top) == len(frames_bottom)
+    frame_count     = len(frames_top)
     tiles_per_frame = 2
-    tile_count = frame_count * tiles_per_frame
+    tile_count      = frame_count * tiles_per_frame
     pal_count_total = len(palette_colors)
-
-    # Interleave top and bottom tiles
     all_tiles = []
     for top, bot in zip(frames_top, frames_bottom):
         all_tiles.append(top)
         all_tiles.append(bot)
-    tile_bytes = tiles_to_2bpp_bytes(all_tiles)
+    tile_bytes  = tiles_to_2bpp_bytes(all_tiles)
     total_tile_b = len(tile_bytes)
     NAME = name.upper()
 
@@ -374,15 +308,12 @@ def write_sprite_files(name, frames_top, frames_bottom, palette_colors,
         f'/* Auto-generated by tools/gen_{name}.py - edit that script to change. */',
         f'#include "{name}.h"',
         '',
-        f'/* GBC sprite palette (1 palette x 4 colors) */',
-        f'/* Color index 0 is transparent on GBC sprites. */',
+        f'/* GBC sprite palette (1 palette x 4 colors). Index 0 = transparent. */',
         f'const palette_color_t {name}_palettes[{pal_count_total}] = {{',
         _format_palette_array(palette_colors),
         '};',
         '',
-        (f'/* Sprite tile data: {frame_count} animation frames x {tiles_per_frame} tiles per frame'
-         f' (8x16 mode),\n'
-         f'   {tile_count} tiles total, 16 bytes per tile = {total_tile_b} bytes */'),
+        f'/* Sprite tiles: {frame_count} frames x {tiles_per_frame} tiles = {tile_count} tiles */',
         f'const uint8_t {name}_tiles[{total_tile_b}] = {{',
         _format_c_bytes(tile_bytes),
         '};',
@@ -409,7 +340,100 @@ def write_sprite_files(name, frames_top, frames_bottom, palette_colors,
         f'extern const palette_color_t {name}_palettes[{pal_count_total}];',
         f'extern const uint8_t {name}_tiles[{total_tile_b}];',
         '',
-        f'#endif',
+        '#endif',
+    ]
+    h_path = os.path.join(out_dir, f'{name}.h')
+    with open(h_path, 'w') as f:
+        f.write('\n'.join(h_lines) + '\n')
+    print(f'Written {h_path}')
+
+
+# ---------------------------------------------------------------------------
+# Sprite file writers (animated: multiple named animations)
+# ---------------------------------------------------------------------------
+
+def write_sprite_files_animated(name, animations, palette_colors,
+                                  pixel_chars, out_dir='.'):
+    """Write .c and .h for a sprite with multiple named animations.
+
+    name         : base symbol name, e.g. 'player'.
+    animations   : OrderedDict / dict { anim_name: [(top_rows, bot_rows), ...] }
+                   top_rows / bot_rows are each 8 strings of 8 characters.
+    palette_colors: list of (r,g,b) tuples (length == 4).
+    pixel_chars  : dict mapping character -> colour index (must include '.': 0).
+    out_dir      : output directory.
+    """
+    def _parse_tile(string_rows):
+        tile = []
+        for row_str in string_rows:
+            row = [pixel_chars.get(c, 0) for c in row_str]
+            assert len(row) == 8, f"Row '{row_str}' must be exactly 8 chars"
+            tile.append(row)
+        assert len(tile) == 8, f"Tile must have exactly 8 rows (got {len(tile)})"
+        return tile
+
+    # Flatten all animations; track start tile index per animation
+    anim_info  = []   # (anim_name, start_tile_idx, frame_count)
+    all_tiles  = []
+    for anim_name, frames in animations.items():
+        start_tile = len(all_tiles)
+        for top_rows, bot_rows in frames:
+            all_tiles.append(_parse_tile(top_rows))
+            all_tiles.append(_parse_tile(bot_rows))
+        anim_info.append((anim_name, start_tile, len(frames)))
+
+    tile_count      = len(all_tiles)
+    pal_count_total = len(palette_colors)
+    tile_bytes      = tiles_to_2bpp_bytes(all_tiles)
+    total_tile_b    = len(tile_bytes)
+    NAME = name.upper()
+
+    # .c file
+    c_lines = [
+        f'/* Auto-generated by tools/gen_sprite.py for sprite "{name}". */',
+        f'#include "{name}.h"',
+        '',
+        f'/* GBC sprite palette (1 palette x 4 colors). Index 0 = transparent. */',
+        f'const palette_color_t {name}_palettes[{pal_count_total}] = {{',
+        _format_palette_array(palette_colors),
+        '};',
+        '',
+        f'/* Sprite tiles: {tile_count} tiles total ({tile_count//2} frames, 2 tiles/frame) */',
+        f'const uint8_t {name}_tiles[{total_tile_b}] = {{',
+        _format_c_bytes(tile_bytes),
+        '};',
+    ]
+    c_path = os.path.join(out_dir, f'{name}.c')
+    with open(c_path, 'w') as f:
+        f.write('\n'.join(c_lines) + '\n')
+    print(f'Written {c_path}')
+
+    # .h file
+    h_guard = f'{NAME}_H'
+    h_lines = [
+        f'/* Auto-generated by tools/gen_sprite.py for sprite "{name}". */',
+        f'#ifndef {h_guard}',
+        f'#define {h_guard}',
+        '',
+        '#include <gb/cgb.h>',
+        '#include <stdint.h>',
+        '',
+        f'#define {NAME}_TILE_COUNT      {tile_count}U',
+        f'#define {NAME}_PALETTE_COUNT    1U',
+        f'#define {NAME}_TILES_PER_FRAME  2U',
+        '',
+    ]
+    for anim_name, start_tile, frame_count in anim_info:
+        au = anim_name.upper()
+        h_lines.append(f'/* Animation: {anim_name} */')
+        h_lines.append(f'#define {NAME}_ANIM_{au}_START   {start_tile}U')
+        h_lines.append(f'#define {NAME}_ANIM_{au}_FRAMES  {frame_count}U')
+        h_lines.append('')
+    h_lines += [
+        f'extern const palette_color_t {name}_palettes[{pal_count_total}];',
+        f'extern const uint8_t {name}_tiles[{total_tile_b}];',
+        '',
+        '#endif',
     ]
     h_path = os.path.join(out_dir, f'{name}.h')
     with open(h_path, 'w') as f:

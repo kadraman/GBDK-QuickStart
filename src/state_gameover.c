@@ -11,43 +11,40 @@
 
 static uint8_t prev_joy;
 
-static void gameover_init(void) {
-    uint8_t x, y;
+static void gameover_init(void)
+{
     prev_joy = 0;
 
-    /* Clear background to sky tile */
-    for (y = 0; y < BACKGROUND_MAP_HEIGHT; y++) {
-        for (x = 0; x < BACKGROUND_MAP_WIDTH; x++) {
-            set_bkg_tile_xy(x, y, 0);
-        }
-    }
-
-    /* Reset all tile attributes to palette 0 (sky) */
+    /* Reload background tilemap and attributes; reset scroll */
+    set_bkg_tiles(0, 0, BACKGROUND_MAP_WIDTH, BACKGROUND_MAP_HEIGHT,
+                  background_map);
     VBK_REG = 1;
-    for (y = 0; y < BACKGROUND_MAP_HEIGHT; y++) {
-        for (x = 0; x < BACKGROUND_MAP_WIDTH; x++) {
-            set_bkg_tile_xy(x, y, 0x00U);
-        }
-    }
+    set_bkg_tiles(0, 0, BACKGROUND_MAP_WIDTH, BACKGROUND_MAP_HEIGHT,
+                  background_attr_map);
     VBK_REG = 0;
 
-    draw_text(5, 7,  "GAME OVER",   FONT_FIRST_TILE);
-    draw_text(3, 10, "SCORE: 000",  FONT_FIRST_TILE);
-    draw_text(2, 14, "PRESS START", FONT_FIRST_TILE);
+    SCX_REG = 0;
+    SCY_REG = 0;
+
+    HIDE_WIN;  /* hide the HUD window shown during gameplay */
+
+    draw_text(5,  6, "GAME OVER",   FONT_FIRST_TILE);
+    draw_text(2,  9, "PRESS START", FONT_FIRST_TILE);
 }
 
-static void gameover_update(void) {
-    uint8_t joy = joypad();
-    uint8_t joy_pressed = joy & ~prev_joy;
+static void gameover_update(void)
+{
+    uint8_t joy       = joypad();
+    uint8_t joy_press = (uint8_t)(joy & ~prev_joy);
 
-    if (joy_pressed & J_START) {
+    if (joy_press & J_START) {
         switch_state(STATE_TITLE_SCREEN);
     }
-
     prev_joy = joy;
 }
 
-static void gameover_cleanup(void) {
+static void gameover_cleanup(void)
+{
     /* Nothing to clean up */
 }
 

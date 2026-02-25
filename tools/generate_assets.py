@@ -2,27 +2,22 @@
 """
 generate_assets.py
 ==================
-Master script: runs all three asset generators in sequence.
+Master script: regenerates all PNG and C/H assets.
 
 Usage
 -----
     python3 tools/generate_assets.py
-
-Or via Make:
     make generate
 
 Each generator can also be run individually:
     python3 tools/gen_background.py
     python3 tools/gen_font.py
-    python3 tools/gen_sprite.py
+    python3 tools/gen_sprite.py           # processes all res/sprites/*/definition.py
 
-Requirements
-------------
-    pip install pillow
+Requirements:  pip install pillow
 """
 
-import os
-import sys
+import os, sys
 
 TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, TOOLS_DIR)
@@ -33,16 +28,16 @@ import gen_sprite
 
 
 def main():
-    print("=== Generating background assets ===")
+    print('=== Generating background assets ===')
     gen_background.main()
     print()
-    print("=== Generating font assets ===")
+    print('=== Generating font assets ===')
     gen_font.main()
     print()
-    print("=== Generating sprite assets ===")
+    print('=== Generating sprite assets (res/sprites/*) ===')
     gen_sprite.main()
     print()
-    print("All assets generated successfully.")
+    print('All assets generated successfully.')
 
 
 if __name__ == '__main__':
