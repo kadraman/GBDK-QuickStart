@@ -41,7 +41,6 @@ static uint8_t      player_hw_y;      /* hardware sprite Y register             
 static int8_t       player_vy;        /* vertical velocity (negative = up)      */
 static uint8_t      player_facing_r;  /* 1 = right, 0 = left                   */
 static PlayerState  player_state;
-static PlayerState  prev_pstate;
 static uint8_t      anim_frame;
 static uint8_t      anim_counter;
 static uint8_t      camera_x;         /* SCX_REG value (0..MAX_SCROLL_X)        */
@@ -148,7 +147,6 @@ static void gameplay_init(void)
     player_vy       = 0;
     player_facing_r = 1U;
     player_state    = PSTATE_IDLE;
-    prev_pstate     = PSTATE_IDLE;
     anim_frame      = 0;
     anim_counter    = 0;
     camera_x        = 0;
@@ -282,7 +280,6 @@ static void gameplay_update(void)
     hw_x = (uint8_t)(player_world_x - camera_x + 8U);
     move_sprite(0, hw_x, player_hw_y);
 
-    prev_pstate = player_state;
     prev_joy    = joy;
 }
 
