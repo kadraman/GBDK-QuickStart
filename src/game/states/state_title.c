@@ -26,6 +26,12 @@ static void title_init(void)
     flash_counter = 0;
     show_prompt   = 1;
 
+    /* Switch to asset bank before loading ROM data into VRAM/palettes.
+     * All res/ assets are placed in bank 1 via #pragma bank 1; BANK()
+     * resolves the correct bank at link time, so the code remains correct
+     * even if auto-banking overflows assets to a higher bank in future. */
+    SWITCH_ROM(BANK(bg_title_tiles));
+
     /* Load title-screen background tiles into VRAM slot 0 */
     set_bkg_data(0, BG_TITLE_TILE_COUNT, bg_title_tiles);
     /* Font tiles immediately after background tiles */
@@ -41,6 +47,9 @@ static void title_init(void)
     VBK_REG = 1;
     set_bkg_tiles(0, 0, BG_TITLE_MAP_WIDTH, BG_TITLE_MAP_HEIGHT, bg_title_attr_map);
     VBK_REG = 0;
+
+    /* Restore game code bank */
+    SWITCH_ROM(1);
 
     SCX_REG = 0;
     SCY_REG = 0;

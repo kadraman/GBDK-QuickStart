@@ -2,6 +2,7 @@
 #ifndef FONT_H
 #define FONT_H
 
+#include <gb/gb.h>
 #include <gb/cgb.h>
 #include <stdint.h>
 
@@ -14,6 +15,7 @@
 #define FONT_TILE_DIAMOND  99U  /* tile offset for diamond */
 #define FONT_TILE_CURSOR  100U  /* tile offset for cursor */
 
+BANKREF_EXTERN(font_tiles)
 extern const palette_color_t font_palettes[4];
 extern const uint8_t font_tiles[1616];
 

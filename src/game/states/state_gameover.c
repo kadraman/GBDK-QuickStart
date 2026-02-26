@@ -24,6 +24,9 @@ static void gameover_init(void)
 {
     prev_joy = 0;
 
+    /* Switch to asset bank before loading ROM data into VRAM/palettes. */
+    SWITCH_ROM(BANK(bg_gameover_tiles));
+
     /* Load game-over background tiles into VRAM slot 0 */
     set_bkg_data(0, BG_GAMEOVER_TILE_COUNT, bg_gameover_tiles);
     /* Font tiles immediately after background tiles */
@@ -41,6 +44,9 @@ static void gameover_init(void)
     set_bkg_tiles(0, 0, BG_GAMEOVER_MAP_WIDTH, BG_GAMEOVER_MAP_HEIGHT,
                   bg_gameover_attr_map);
     VBK_REG = 0;
+
+    /* Restore game code bank */
+    SWITCH_ROM(1);
 
     SCX_REG = 0;
     SCY_REG = 0;

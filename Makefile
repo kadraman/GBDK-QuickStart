@@ -43,6 +43,12 @@ RESDIR      = res
 # GBC mode flag + joined mode
 LCCFLAGS    = -Wm-yc
 LCCFLAGS   += -Wl-j
+# MBC5 cartridge type (supports up to 512 ROM banks, recommended for GBC)
+LCCFLAGS   += -Wm-yt25
+# Auto banking: when a bank is full the linker automatically overflows
+# data/code into the next bank.  Code that accesses banked data must call
+# SWITCH_ROM(BANK(symbol)) / SWITCH_ROM(1) around each access.
+LCCFLAGS   += -Wm-ybo
 
 BINS        = $(OBJDIR)/$(PROJECTNAME).gbc
 

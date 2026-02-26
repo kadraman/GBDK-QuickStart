@@ -2,6 +2,7 @@
 #ifndef ENEMY_H
 #define ENEMY_H
 
+#include <gb/gb.h>
 #include <gb/cgb.h>
 #include <stdint.h>
 
@@ -19,6 +20,7 @@
 #define ENEMY_ANIM_WALK_FRAMES  2U
 #define ENEMY_ANIM_WALK_SPEED   10U
 
+BANKREF_EXTERN(enemy_tiles)
 extern const palette_color_t enemy_palettes[4];
 extern const uint8_t enemy_tiles[128];
 

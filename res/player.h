@@ -2,6 +2,7 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
+#include <gb/gb.h>
 #include <gb/cgb.h>
 #include <stdint.h>
 
@@ -29,6 +30,7 @@
 #define PLAYER_ANIM_DIE_FRAMES  3U
 #define PLAYER_ANIM_DIE_SPEED   20U
 
+BANKREF_EXTERN(player_tiles)
 extern const palette_color_t player_palettes[4];
 extern const uint8_t player_tiles[704];
 

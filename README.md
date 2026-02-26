@@ -157,6 +157,121 @@ Press **Ctrl+Shift+B** (or **Cmd+Shift+B**) to run the default **Build GBC ROM**
 
 ---
 
+## ROM Banking
+
+### Overview
+
+The project uses **GBDK-2020 auto-banking with MBC5**, enabled by the
+following Makefile flags:
+
+```makefile
+LCCFLAGS += -Wm-yt25   # MBC5 cartridge type (up to 512 × 16 KB banks)
+LCCFLAGS += -Wm-ybo    # auto bank overflow: linker fills each bank in turn
+```
+
+**How auto-banking works:**
+- ROM bank 0 (0x0000–0x3FFF) is fixed and always visible. It holds the GBDK
+  library runtime and interrupt vectors.
+- ROM bank 1 (0x4000–0x7FFF) is the default switchable bank. Game code and
+  asset data are placed there initially.
+- When bank 1 becomes full, `-Wm-ybo` causes the linker to automatically
+  overflow surplus data into bank 2, then bank 3, and so on.
+- No manual linker scripts or bank-number calculations are required.
+
+### Marking asset data as banked
+
+Every `res/` asset source file is decorated with two things:
+
+```c
+/* at the top of the file, before the include */
+#pragma bank 1          /* pin this file's data to ROM bank 1 */
+#include "bg_title.h"
+
+/* immediately after the tile data array */
+const uint8_t bg_title_tiles[160] = { ... };
+BANKREF(bg_title_tiles) /* let BANK() resolve the actual bank at link time */
+```
+
+The `BANKREF(symbol)` macro creates an internal reference variable that the
+`BANK(symbol)` macro reads at runtime to obtain the bank number the symbol
+was placed in. This means even if auto-banking overflows data to bank 2 or
+higher, the access code needs no manual updates.
+
+The matching header declares:
+
+```c
+BANKREF_EXTERN(bg_title_tiles)   /* make the bank reference visible */
+extern const uint8_t bg_title_tiles[];
+```
+
+### Accessing banked data from game code
+
+Before calling any GBDK function that dereferences a pointer into the banked
+area (e.g. `set_bkg_data`, `set_sprite_data`, `set_bkg_palette`,
+`set_bkg_tiles`), switch to the asset bank and restore afterwards:
+
+```c
+/* switch to the bank containing the asset */
+SWITCH_ROM(BANK(bg_title_tiles));
+
+set_bkg_data(0, BG_TITLE_TILE_COUNT, bg_title_tiles);
+set_bkg_data(BG_TITLE_TILE_COUNT, FONT_TILE_COUNT, font_tiles);
+set_bkg_palette(0, BG_TITLE_PALETTE_COUNT, bg_title_palettes);
+
+/* restore the game-code bank (bank 1) */
+SWITCH_ROM(1);
+```
+
+> **Why `SWITCH_ROM(1)` to restore?**  All game-logic source files are
+> compiled without a `#pragma bank` pragma, so the linker places them in
+> bank 1 by default.  If your project grows and game code overflows to bank 2,
+> replace the restore call with `SWITCH_ROM(BANK(some_function_symbol))` or
+> track the current bank with a variable.
+
+All state `init()` functions and `main()` already follow this pattern.  The
+streaming helper `load_bg_column()` in `state_gameplay.c` also performs its
+own `SWITCH_ROM` pair so it is safe to call from any bank context.
+
+### Guidelines for adding new assets
+
+1. **Create the asset files** (PNG → run `make generate` or the matching
+   `tools/gen_*.py` script).  The generator scripts in `tools/` have been
+   updated to emit `#pragma bank 1`, `BANKREF(symbol)`, and
+   `BANKREF_EXTERN(symbol)` automatically.
+
+2. **No manual bank number assignment needed** for new assets.  As long as the
+   `.c` file begins with `#pragma bank 1` and ends with `BANKREF(name_tiles)`,
+   and the `.h` file contains `BANKREF_EXTERN(name_tiles)`, the banking
+   infrastructure handles the rest.
+
+3. **When loading the asset** (usually in a state's `init()` function), wrap
+   the GBDK calls with:
+   ```c
+   SWITCH_ROM(BANK(my_new_tiles));
+   set_bkg_data(..., my_new_tiles);
+   /* ... other loads from the same bank ... */
+   SWITCH_ROM(1);
+   ```
+
+4. **Watch bank 1 capacity (~32 KB)**. If you add many large assets or a
+   significant amount of game code, bank 1 may fill up. When `-Wm-ybo` overflows
+   data to bank 2, the `BANK(symbol)` macro returns 2 automatically, so
+   `SWITCH_ROM(BANK(symbol))` remains correct.  The only additional work is to
+   ensure the restore call matches the bank that code is executing from.
+
+5. **Functions that read banked data every frame** (like `load_bg_column`)
+   should call `SWITCH_ROM` internally rather than relying on the caller to do
+   so, because they may be invoked from multiple call sites or different bank
+   contexts in the future.
+
+6. **Do not call banked functions directly from a different bank** without the
+   `__banked` attribute and corresponding `BANKREF`/`BANK` indirection.
+   Cross-bank function calls require the `__banked` attribute on the callee;
+   see the [GBDK-2020 banked-functions docs](https://gbdk-2020.github.io/gbdk-2020/docs/api/docs_supported_consoles.html)
+   for details.
+
+---
+
 ## GBC Color Features
 
 ### Palettes

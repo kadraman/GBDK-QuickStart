@@ -24,6 +24,9 @@ static void win_init(void)
 {
     prev_joy = 0;
 
+    /* Switch to asset bank before loading ROM data into VRAM/palettes. */
+    SWITCH_ROM(BANK(bg_win_tiles));
+
     /* Load win background tiles into VRAM slot 0 */
     set_bkg_data(0, BG_WIN_TILE_COUNT, bg_win_tiles);
     /* Font tiles immediately after background tiles */
@@ -39,6 +42,9 @@ static void win_init(void)
     VBK_REG = 1;
     set_bkg_tiles(0, 0, BG_WIN_MAP_WIDTH, BG_WIN_MAP_HEIGHT, bg_win_attr_map);
     VBK_REG = 0;
+
+    /* Restore game code bank */
+    SWITCH_ROM(1);
 
     SCX_REG = 0;
     SCY_REG = 0;

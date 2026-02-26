@@ -49,6 +49,12 @@ void main(void) {
     /* Slot 4: HUD red palette (red text on dark background – lives hearts) */
     set_bkg_palette(4, 1, hud_red_palette);
 
+    /* --- Switch to asset bank and load sprite data ---
+     * player_tiles and enemy_tiles are in bank 1 (#pragma bank 1).
+     * BANK() resolves the correct bank at link time so this stays correct
+     * even if auto-banking places these arrays in a higher bank later. */
+    SWITCH_ROM(BANK(player_tiles));
+
     /* --- GBC sprite palettes --- */
     /* Slot 0: player palette */
     set_sprite_palette(0, PLAYER_PALETTE_COUNT, player_palettes);
@@ -58,6 +64,9 @@ void main(void) {
     /* --- Load sprite tiles (persists across all states) --- */
     set_sprite_data(0, PLAYER_TILE_COUNT, player_tiles);
     set_sprite_data(PLAYER_TILE_COUNT, ENEMY_TILE_COUNT, enemy_tiles);
+
+    /* Restore game code bank */
+    SWITCH_ROM(1);
 
     /* Use 8x16 sprite mode */
     SPRITES_8x16;
