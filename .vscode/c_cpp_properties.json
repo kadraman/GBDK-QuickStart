@@ -3,14 +3,15 @@
         {
             "name": "GBDK",
             "includePath": [
+                "${env:GBDK_HOME}/include",
                 "${workspaceFolder}/src",
                 "${workspaceFolder}/res",
-                "${env:GBDK_HOME}/include"
+                "${workspaceFolder}/src/lib/include"
             ],
             "browse": {
                 "path": [
-                    "${workspaceFolder}/src",
-                    "${env:GBDK_HOME}/include"
+                    "${env:GBDK_HOME}/include",
+                    "${workspaceFolder}/src"
                 ],
                 "limitSymbolsToIncludedHeaders": true
             },

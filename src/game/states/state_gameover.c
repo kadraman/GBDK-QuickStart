@@ -4,11 +4,8 @@
 #include "states.h"
 #include "state_gameover.h"
 #include "utils.h"
-#include "../res/bg_gameover.h"
-#include "../res/font.h"
-
-/* Font starts at VRAM tile 128 (fixed across all states) */
-#define FONT_FIRST_TILE 128U
+#include "bg_gameover.h"
+#include "font.h"
 
 /* Font palette with dark-crimson background colour to match bg_gameover */
 static const palette_color_t gameover_font_palette[4] = {
@@ -18,6 +15,9 @@ static const palette_color_t gameover_font_palette[4] = {
     RGB8( 85,  85,  85),   /* 3 - unused                      */
 };
 
+/* Font starts immediately after bg_gameover tiles in VRAM */
+#define FONT_FIRST_TILE  BG_GAMEOVER_TILE_COUNT
+
 static uint8_t prev_joy;
 
 static void gameover_init(void)
@@ -26,11 +26,12 @@ static void gameover_init(void)
 
     /* Load game-over background tiles into VRAM slot 0 */
     set_bkg_data(0, BG_GAMEOVER_TILE_COUNT, bg_gameover_tiles);
+    /* Font tiles immediately after background tiles */
+    set_bkg_data(BG_GAMEOVER_TILE_COUNT, FONT_TILE_COUNT, font_tiles);
 
     /* Set game-over background palettes (slots 0-1) */
     set_bkg_palette(0, BG_GAMEOVER_PALETTE_COUNT, bg_gameover_palettes);
-
-    /* Set font palette to match dark-crimson background (slot 2) */
+    /* Font palette with dark-crimson background (slot 2) */
     set_bkg_palette(2, 1, gameover_font_palette);
 
     /* Load tilemap and palette attributes; reset scroll */

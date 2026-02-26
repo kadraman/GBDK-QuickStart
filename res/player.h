@@ -5,27 +5,31 @@
 #include <gb/cgb.h>
 #include <stdint.h>
 
-#define PLAYER_TILE_COUNT      22U
+#define PLAYER_TILE_COUNT      44U
 #define PLAYER_PALETTE_COUNT    1U
-#define PLAYER_TILES_PER_FRAME  2U
+#define PLAYER_TILES_PER_FRAME  4U
 
 /* Animation: idle */
 #define PLAYER_ANIM_IDLE_START   0U
 #define PLAYER_ANIM_IDLE_FRAMES  2U
+#define PLAYER_ANIM_IDLE_SPEED   20U
 
 /* Animation: walk */
-#define PLAYER_ANIM_WALK_START   4U
+#define PLAYER_ANIM_WALK_START   8U
 #define PLAYER_ANIM_WALK_FRAMES  4U
+#define PLAYER_ANIM_WALK_SPEED   8U
 
 /* Animation: jump */
-#define PLAYER_ANIM_JUMP_START   12U
+#define PLAYER_ANIM_JUMP_START   24U
 #define PLAYER_ANIM_JUMP_FRAMES  2U
+#define PLAYER_ANIM_JUMP_SPEED   1U
 
 /* Animation: die */
-#define PLAYER_ANIM_DIE_START   16U
+#define PLAYER_ANIM_DIE_START   32U
 #define PLAYER_ANIM_DIE_FRAMES  3U
+#define PLAYER_ANIM_DIE_SPEED   20U
 
 extern const palette_color_t player_palettes[4];
-extern const uint8_t player_tiles[352];
+extern const uint8_t player_tiles[704];
 
 #endif

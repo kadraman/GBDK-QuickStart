@@ -4,19 +4,19 @@
 #include "states.h"
 #include "state_title.h"
 #include "utils.h"
-#include "../res/bg_title.h"
-#include "../res/font.h"
+#include "bg_title.h"
+#include "font.h"
 
-/* Font starts at VRAM tile 128 (fixed across all states) */
-#define FONT_FIRST_TILE 128U
-
-/* Font palette with night-sky background colour to match bg_title */
+/* Font palette slot 2 with night-sky background colour to match bg_title */
 static const palette_color_t title_font_palette[4] = {
     RGB8(  0,   0,  60),   /* 0 - night sky background        */
     RGB8(255, 255, 180),   /* 1 - warm white text             */
     RGB8(170, 170, 170),   /* 2 - unused                      */
     RGB8( 85,  85,  85),   /* 3 - unused                      */
 };
+
+/* Font starts immediately after bg_title tiles in VRAM */
+#define FONT_FIRST_TILE  BG_TITLE_TILE_COUNT
 
 static uint8_t flash_counter;
 static uint8_t show_prompt;
@@ -28,11 +28,12 @@ static void title_init(void)
 
     /* Load title-screen background tiles into VRAM slot 0 */
     set_bkg_data(0, BG_TITLE_TILE_COUNT, bg_title_tiles);
+    /* Font tiles immediately after background tiles */
+    set_bkg_data(BG_TITLE_TILE_COUNT, FONT_TILE_COUNT, font_tiles);
 
     /* Set title background palettes (slots 0-1) */
     set_bkg_palette(0, BG_TITLE_PALETTE_COUNT, bg_title_palettes);
-
-    /* Set font palette to match night-sky background (slot 2) */
+    /* Font palette with night-sky background (slot 2) */
     set_bkg_palette(2, 1, title_font_palette);
 
     /* Load tilemap and palette attributes */
