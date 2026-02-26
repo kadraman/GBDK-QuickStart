@@ -42,7 +42,7 @@ Palette layout
     3 = dirt dark  (80,50,20)
 """
 
-NAME = 'background'
+NAME = 'bg_gameplay'
 
 # ---------------------------------------------------------------------------
 # Palettes
@@ -248,10 +248,10 @@ _TREES = [(4,5), (17,18), (31,32), (44,45)]
 # Pits: columns where ground is missing (world col ranges, inclusive)
 # PIT1: cols 10-12 (3 tiles)
 # PIT2: cols 21-24 (4 tiles)
-# PIT3: cols 34-39 (6 tiles, wide jump)
-_PITS = [(10,12), (21,24), (34,39)]
+# PIT3: cols 34-38 (5 tiles, wide jump)
+_PITS = [(10,12), (21,24), (34,38)]
 
-# Platform blocks: cols where row 8 has a platform tile
+# Platform blocks: cols where row 9 has a platform tile
 # Placed on solid ground sections, before or between pits
 _PLAT_COLS = {7, 15, 16, 27, 28, 42}
 
@@ -277,7 +277,7 @@ def _build_tilemap():
                     tile = _DIRT
                 elif row == 10:
                     tile = _GRASS
-                elif row == 8 and col in _PLAT_COLS:
+                elif row == 9 and col in _PLAT_COLS:
                     tile = _PLAT
                 else:
                     # Clouds

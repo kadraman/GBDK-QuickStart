@@ -6,7 +6,8 @@
                 "${env:GBDK_HOME}/include",
                 "${workspaceFolder}/src",
                 "${workspaceFolder}/res",
-                "${workspaceFolder}/src/lib/include"
+                "${workspaceFolder}/src/lib/include",
+                "${workspaceFolder}/src/game/sprites"
             ],
             "browse": {
                 "path": [

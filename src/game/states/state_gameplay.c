@@ -7,7 +7,7 @@
 #include "sprite_manager.h"
 #include "sprite_player.h"
 #include "sprite_enemy.h"
-#include "background.h"
+#include "bg_gameplay.h"
 #include "font.h"
 #include "player.h"
 #include "enemy.h"
@@ -16,7 +16,7 @@
  * Constants
  * -------------------------------------------------------------------- */
 /* Font starts immediately after background tiles in VRAM */
-#define FONT_FIRST_TILE  BACKGROUND_TILE_COUNT
+#define FONT_FIRST_TILE  BG_GAMEPLAY_TILE_COUNT
 
 /* Win condition: reached the end of the 48-tile level */
 #define CHECKPOINT_X16   360U   /* world-X >= 360 triggers win           */
@@ -69,14 +69,14 @@ static void load_bg_column(uint8_t level_col)
     uint8_t bg_col = (uint8_t)(level_col % 32U);
     uint8_t row;
     VBK_REG = 0;
-    for (row = 0; row < BACKGROUND_MAP_HEIGHT; row++) {
+    for (row = 0; row < BG_GAMEPLAY_MAP_HEIGHT; row++) {
         set_bkg_tile_xy(bg_col, row,
-            background_map[(uint16_t)row * BACKGROUND_MAP_WIDTH + level_col]);
+            bg_gameplay_map[(uint16_t)row * BG_GAMEPLAY_MAP_WIDTH + level_col]);
     }
     VBK_REG = 1;
-    for (row = 0; row < BACKGROUND_MAP_HEIGHT; row++) {
+    for (row = 0; row < BG_GAMEPLAY_MAP_HEIGHT; row++) {
         set_bkg_tile_xy(bg_col, row,
-            background_attr_map[(uint16_t)row * BACKGROUND_MAP_WIDTH + level_col]);
+            bg_gameplay_attr_map[(uint16_t)row * BG_GAMEPLAY_MAP_WIDTH + level_col]);
     }
     VBK_REG = 0;
 }
@@ -207,13 +207,13 @@ static void gameplay_init(void)
 
     sprite_manager_init();
 
-    /* Load gameplay background tiles (slot 0..BACKGROUND_TILE_COUNT-1) */
-    set_bkg_data(0, BACKGROUND_TILE_COUNT, background_tiles);
+    /* Load gameplay background tiles (slot 0..BG_GAMEPLAY_TILE_COUNT-1) */
+    set_bkg_data(0, BG_GAMEPLAY_TILE_COUNT, bg_gameplay_tiles);
     /* Font tiles immediately after background tiles */
-    set_bkg_data(BACKGROUND_TILE_COUNT, FONT_TILE_COUNT, font_tiles);
+    set_bkg_data(BG_GAMEPLAY_TILE_COUNT, FONT_TILE_COUNT, font_tiles);
 
     /* Background palettes (slots 0-1: sky and ground) */
-    set_bkg_palette(0, BACKGROUND_PALETTE_COUNT, background_palettes);
+    set_bkg_palette(0, BG_GAMEPLAY_PALETTE_COUNT, bg_gameplay_palettes);
     /* Font palette: sky-blue background, black text (slot 2) */
     set_bkg_palette(2, 1, gameplay_font_palette);
 
@@ -320,7 +320,7 @@ static void gameplay_update(void)
      * Pre-load columns just off the right edge of the screen.           */
     cam_tile   = (uint8_t)(camera_x >> 3);
     needed_col = (uint8_t)(cam_tile + 21U);
-    if (needed_col < BACKGROUND_MAP_WIDTH && needed_col >= bg_stream_right) {
+    if (needed_col < BG_GAMEPLAY_MAP_WIDTH && needed_col >= bg_stream_right) {
         load_bg_column(bg_stream_right);
         bg_stream_right++;
     }

@@ -10,9 +10,9 @@
 /* -----------------------------------------------------------------------
  * Player physics constants
  * -------------------------------------------------------------------- */
-#define JUMP_VY          (-5)   /* initial jump velocity (negative = up) */
+#define JUMP_VY          (-6)   /* initial jump velocity (negative = up) */
 #define WALK_SPEED         1U   /* world pixels per frame                */
-#define GRAVITY_DELAY      2U   /* frames between gravity steps          */
+#define GRAVITY_DELAY      3U   /* frames between gravity steps          */
 
 /* World extents – 48-tile map */
 #define MAX_WORLD_X      376U   /* 48*8-8 = 376                          */
