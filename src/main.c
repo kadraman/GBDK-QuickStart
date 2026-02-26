@@ -2,9 +2,18 @@
 #include <gb/cgb.h>
 #include <stdint.h>
 #include "states.h"
-#include "../res/background.h"
 #include "../res/font.h"
 #include "../res/player.h"
+
+/*
+ * Fixed VRAM tile layout:
+ *   Slots   0..127 : background tiles (loaded per-state in each state's init)
+ *   Slots 128..228 : font tiles (loaded once here; position is constant)
+ *
+ * Each state's init function loads its own background tiles at slot 0
+ * and sets up the appropriate background palettes (slots 0-1).
+ */
+#define FONT_BASE_TILE  128U
 
 /* HUD window palette (dark background, white text) */
 static const palette_color_t hud_palette[4] = {
@@ -25,15 +34,12 @@ static const palette_color_t hud_red_palette[4] = {
 void main(void) {
     DISPLAY_OFF;
 
-    /* --- Load tile graphics into VRAM bank 0 --- */
-    /* Background tiles at slots 0 .. BACKGROUND_TILE_COUNT-1 */
-    set_bkg_data(0, BACKGROUND_TILE_COUNT, background_tiles);
-    /* Font tiles immediately after background tiles */
-    set_bkg_data(BACKGROUND_TILE_COUNT, FONT_TILE_COUNT, font_tiles);
+    /* --- Load font tiles at fixed VRAM slot FONT_BASE_TILE --- */
+    /* Font is always at this position; each state loads its own bg tiles at 0 */
+    set_bkg_data(FONT_BASE_TILE, FONT_TILE_COUNT, font_tiles);
 
-    /* --- GBC background palettes (slots 0-1: sky and ground) --- */
-    set_bkg_palette(0, BACKGROUND_PALETTE_COUNT, background_palettes);
-    /* Slot 2: font palette (black text on sky-matching background) */
+    /* --- GBC background palettes --- */
+    /* Slot 2: font palette (loaded once; states may reload with state-specific bg color) */
     set_bkg_palette(2, FONT_PALETTE_COUNT, font_palettes);
     /* Slot 3: HUD palette (white text on dark background) */
     set_bkg_palette(3, 1, hud_palette);

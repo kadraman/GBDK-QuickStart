@@ -52,7 +52,8 @@ ALLSRC      = $(SRCSRC) $(RESSRC)
 OBJS        = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCSRC)) \
               $(patsubst $(RESDIR)/%.c,$(OBJDIR)/%.o,$(RESSRC))
 
-PNG_ASSETS  = $(RESDIR)/background.png $(RESDIR)/font.png $(RESDIR)/player.png
+PNG_ASSETS  = $(RESDIR)/background.png $(RESDIR)/font.png $(RESDIR)/player.png \
+              $(RESDIR)/bg_title.png $(RESDIR)/bg_gameover.png
 
 .PHONY: all generate convert clean clean-generated run
 
@@ -65,9 +66,11 @@ generate:
 
 # Convert PNG assets to GBDK-compatible C source files using png2asset.
 convert:
-	$(PNG2ASSET) $(RESDIR)/background.png -c $(RESDIR)/background.c -map -bpp 2 -max_palettes 2
-	$(PNG2ASSET) $(RESDIR)/font.png       -c $(RESDIR)/font.c       -map -bpp 2 -max_palettes 1
-	$(PNG2ASSET) $(RESDIR)/player.png     -c $(RESDIR)/player.c          -bpp 2 -max_palettes 1 -spr8x16 -sw 8 -sh 16
+	$(PNG2ASSET) $(RESDIR)/background.png  -c $(RESDIR)/background.c  -map -bpp 2 -max_palettes 2
+	$(PNG2ASSET) $(RESDIR)/bg_title.png    -c $(RESDIR)/bg_title.c    -map -bpp 2 -max_palettes 2
+	$(PNG2ASSET) $(RESDIR)/bg_gameover.png -c $(RESDIR)/bg_gameover.c -map -bpp 2 -max_palettes 2
+	$(PNG2ASSET) $(RESDIR)/font.png        -c $(RESDIR)/font.c        -map -bpp 2 -max_palettes 1
+	$(PNG2ASSET) $(RESDIR)/player.png      -c $(RESDIR)/player.c           -bpp 2 -max_palettes 1 -spr8x16 -sw 8 -sh 16
 
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
@@ -98,5 +101,6 @@ clean:
 # Remove only build artifacts; use `make clean-generated` to remove generated
 # asset sources in `res/` (background, font, sprite).
 clean-generated:
-	# Remove generated asset sources in res/ (background, font, sprite)
-	rm -f $(RESDIR)/background.* $(RESDIR)/font.* $(RESDIR)/player.*
+	# Remove generated asset sources in res/ (backgrounds, fonts, sprites)
+	rm -f $(RESDIR)/background.* $(RESDIR)/bg_title.* $(RESDIR)/bg_gameover.*
+	rm -f $(RESDIR)/font.* $(RESDIR)/player.*
