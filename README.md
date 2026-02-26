@@ -5,19 +5,19 @@ It Includes a state-machine game loop, pre-generated 2bpp tile assets, GBC color
 
 ---
 
-## Overview
+## Features
 
-| Feature | Details |
-|---|---|
-| Hardware target | Game Boy Color (GBC) |
-| SDK | GBDK-2020 (`lcc` / `sdcc`) |
-| Language | C (C99 compatible) |
-| Screens | Title → Gameplay → Game Over |
-| Sprites | 8×16 mode, multi-frame walk cycle |
-| Background | 20×18 tilemap with 2 GBC palettes |
-| Font | 5×7 bitmap font, ASCII 32–127 |
-
----
+- **Reusable C library (src/lib)**: `sprite` (sprite struct + collision helpers), `sprite_manager` (fixed-size pool, alloc/free/update_hw), `state_machine` (simple GameState framework), and `utils` (drawing helpers). Public headers live in `src/lib/include`.
+- **Game application (src/game)**: `main.c`, state implementations (title, gameplay, gameover, win), and game-specific sprite modules (`sprite_player`, `sprite_enemy`) that consume the reusable library.
+- **Sprite & animation**: 8×16 sprite support, per-sprite tile base, frames-per-animation, flip and palette control, and hardware OAM placement helpers.
+- **Collision & pooling**: AABB collision helper `sprites_collide()` and a small sprite pool (`SPRITE_MANAGER_MAX`) for predictable memory/OBJ usage.
+- **GBC color support**: background and sprite palette setup, VRAM bank attribute writes (VBK_REG), and example HUD window palettes.
+- **Multiple named backgrounds**: One `res/backgrounds/<name>/definition.py` per state produces `res/<name>.c/.h`. States load their own tiles and palettes on `init()` to provide distinct themed visuals (night sky for title, crimson for game-over, golden for win, scrolling 48-tile level for gameplay).
+- **Multiple fonts**: Font definitions in `res/fonts/<name>/definition.py`, same auto-discovery as backgrounds and sprites.
+- **Timer HUD**: A 60-second countdown (`TIME: XX`) displayed in the HUD during gameplay; reaching zero triggers game-over.
+- **Wide pitfall level**: 48-tile (384 px) scrolling level with 3 pit zones, 4 raised platforms, and column streaming into the 32-tile hardware ring buffer.
+- **Asset tooling**: Python generators in `tools/` to produce indexed PNGs and `.c/.h` asset files; optional `png2asset` conversion via Makefile.
+- **Modular includes**: Makefile adds `-Isrc/lib/include` and `-Ires` so code can `#include "sprite.h"` and `#include "background.h"` without path noise.
 
 ## Prerequisites
 
@@ -38,35 +38,60 @@ export GBDK_HOME=/path/to/gbdk
 ## Project Structure
 
 ```
-GBC-Template/
+GBDK-QuickStart/
 ├── src/
-│   ├── main.c              # Entry point: VRAM setup, palette load, main loop
-│   ├── states.h            # GameState struct + enum + function declarations
-│   ├── state_machine.c     # switch_state() / run_current_state() implementation
-│   ├── state_title.c/.h    # Title screen state
-│   ├── state_gameplay.c/.h # Gameplay state (d-pad movement, animation)
-│   ├── state_gameover.c/.h # Game over state
-│   └── utils.c/.h          # Shared draw_text() helper
-├── res/
-│   ├── background.png      # 160×144 indexed PNG (sky/cloud/grass/ground, 32×18 tiles)
-│   ├── font.png            # 128×56 indexed PNG (101 chars, ASCII 32–127 + ♠♣♥♦►)
-│   ├── player.png          # 8×N  indexed PNG (player: idle/walk/jump/die animations)
-│   ├── background.c/.h     # Pre-generated 2bpp tile data + GBC palettes + tilemap
-│   ├── font.c/.h           # Pre-generated 2bpp font tile data
-│   └── sprite.c/.h         # Pre-generated 2bpp sprite tile data + GBC palette
-├── tools/
-│   ├── gbc_asset_builder.py  # Reusable library: 2bpp conversion, .c/.h writers
-│   ├── gen_background.py     # Generates res/background.{png,c,h}
-│   ├── gen_font.py           # Generates res/font.{png,c,h}
-│   ├── gen_sprite.py         # Generates res/sprite.{png,c,h}
-│   └── generate_assets.py    # Master script: runs all three generators
+│   ├── lib/                  # Reusable library code (public headers + impl)
+│   │   ├── include/          # Public API headers (add -Isrc/lib/include)
+│   │   │   ├── sprite.h
+│   │   │   ├── sprite_manager.h
+│   │   │   └── states.h
+│   │   └── src/              # Library implementations
+│   │       ├── sprite.c
+│   │       ├── sprite_manager.c
+│   │       └── state_machine.c
+│   └── game/                 # Application / game-specific code
+│       ├── main.c            # Entry: VRAM setup, palettes, main loop
+│       ├── states/           # State implementations (game logic)
+│       │   ├── state_title.c
+│       │   ├── state_gameplay.c
+│       │   ├── state_gameover.c
+│       │   └── state_win.c
+│       └── sprites/          # Game-specific sprite modules
+│           ├── sprite_player.c
+│           └── sprite_enemy.c
+├── res/                     # Generated assets (PNG + .c/.h from generators)
+│   ├── backgrounds/          # Background definitions (one sub-dir per state)
+│   │   ├── gameplay/definition.py  → background.c/.h (48-tile wide level)
+│   │   ├── title/definition.py     → bg_title.c/.h   (night sky)
+│   │   ├── gameover/definition.py  → bg_gameover.c/.h (crimson sky)
+│   │   └── win/definition.py       → bg_win.c/.h     (golden sky)
+│   ├── fonts/
+│   │   └── default/definition.py  → font.c/.h
+│   ├── sprites/
+│   │   ├── player/definition.py   → player.c/.h (16x16 animated)
+│   │   └── enemy/definition.py    → enemy.c/.h  (8x8 patrol enemy)
+│   ├── background.png / background.c/.h
+│   ├── bg_title.png / bg_title.c/.h
+│   ├── bg_gameover.png / bg_gameover.c/.h
+│   ├── bg_win.png / bg_win.c/.h
+│   ├── font.png / font.c/.h
+│   ├── player.png / player.c/.h
+│   └── enemy.png / enemy.c/.h
+├── tools/                   # Asset generation scripts (Python)
 ├── .vscode/
-│   ├── c_cpp_properties.json  # IntelliSense paths for GBDK headers
-│   ├── tasks.json             # Build / generate / convert / clean tasks
-│   └── extensions.json        # Recommended VS Code extensions
-├── Makefile                # Build system
+├── Makefile                 # Build system (now sets include flags for lib/game/res)
 └── README.md
 ```
+
+Notes:
+- Public library headers live in `src/lib/include`. The `Makefile` already
+   sets compiler `-I` include paths for `src/lib/include`, `src/game`,
+   `src/game/states`, `src/game/sprites` and `res/` so sources may simply
+   `#include "sprite.h"` or `#include "background.h"` as seen in the code.
+- Reusable logic (sprite manager, collision, state machine, utils) is in
+   `src/lib/*` and can be extracted to separate projects or published as a
+   small library in future.
+
 
 ---
 
@@ -82,7 +107,8 @@ make all
 ### 2. Run in Emulicious
 
 ```bash
-Emulicious obj/quickstart.gbc
+make run
+# or Emulicious obj/quickstart.gbc
 ```
 
 On Windows the Makefile defaults `EMULICIOUS` to `Emulicious.exe`; on Unix-like systems it will prefer a system `Emulicious` binary or fall back to `java -jar Emulicious.jar`. Override with `make EMULICIOUS="java -jar /path/to/Emulicious.jar" run` if required.
@@ -239,9 +265,65 @@ generating all PNG and C/H source files from scratch.  No GBDK installation is n
 
 ### Add more sprites
 
-1. Add 16×16 frames to `sprite.png` (each row of 2 tiles = one 8×16 sprite pair)
-2. Update `PLAYER_ANIM_WALK_FRAMES` in `player.h`
-3. Use `set_sprite_tile()` / `move_sprite()` in your state
+1. If you prefer manual PNG edits:
+    - Edit the sprite PNG in `res/` (for example `res/player.png`). For this
+       template the sprite layout expects 8×8 tiles arranged so that each 16×16
+       logical sprite uses two 8×8 tiles stacked (8×16 mode). For a 16×16
+       character frame you typically place the left and right halves as two
+       consecutive tiles.
+    - Regenerate the C/H asset pair with either the Python generators or
+       `png2asset` (see below), then rebuild.
+
+2. Using the built-in definition workflow (recommended):
+    - Each sprite has a small directory under `res/sprites/` (for example
+       `res/sprites/player/`) that contains a `definition.py` describing
+       frames, animation constants and palette information. To add or update a
+       game sprite create or edit `res/sprites/<name>/definition.py` and adjust
+       the frames and metadata (start indices, frames-per-animation, tile
+       counts, palette indices) to match your artwork.
+    - Run the asset generator to produce the `res/<name>.c` and `res/<name>.h`
+       files. The simplest way is to run the master generator which picks up
+       all definitions:
+
+```bash
+make generate
+```
+
+After generation you will find symbols in the header such as
+`PLAYER_TILE_COUNT`, `PLAYER_TILES_PER_FRAME`, `PLAYER_ANIM_WALK_START`,
+and arrays `player_tiles`, `player_palettes` that your code can use.
+Update your game code to reference the generated constants (for
+example pass the generated `PLAYER_TILE_COUNT` as the `tile_base` or
+use `PLAYER_ANIM_*` constants when selecting frames).
+
+3. Alternative: convert PNGs directly with `png2asset` (GBDK tool):
+    - Edit `res/<name>.png` and run:
+
+```bash
+make convert
+```
+
+This uses `png2asset` to create `.c/.h` files under `res/` (Makefile's
+`convert` target is configured for the included assets).
+
+4. Rebuild and test:
+
+```bash
+make all
+make run
+```
+
+5. Notes & tips:
+    - Generated headers expose both tile data and animation constants — use
+       those instead of hardcoding tile indexes to keep code resilient when
+       tile ordering changes.
+    - If you only changed a single sprite definition but want to regenerate
+       everything quickly, `make generate` is the simplest option. If you have
+       a custom workflow you can invoke `python tools/gen_sprite.py` directly
+       (see that script for CLI options).
+    - Keep the `definition.py` alongside your source art in `res/sprites/`
+       so the source of truth for the sprite layout is versioned with the
+       project.
 
 ### Add sound
 

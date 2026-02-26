@@ -10,9 +10,9 @@ Usage
     make generate
 
 Each generator can also be run individually:
-    python3 tools/gen_background.py
-    python3 tools/gen_font.py
-    python3 tools/gen_sprite.py           # processes all res/sprites/*/definition.py
+    python3 tools/gen_background.py   # processes all res/backgrounds/*/definition.py
+    python3 tools/gen_font.py         # processes all res/fonts/*/definition.py
+    python3 tools/gen_sprite.py       # processes all res/sprites/*/definition.py
 
 Requirements:  pip install pillow
 """
@@ -28,10 +28,10 @@ import gen_sprite
 
 
 def main():
-    print('=== Generating background assets ===')
+    print('=== Generating background assets (res/backgrounds/*) ===')
     gen_background.main()
     print()
-    print('=== Generating font assets ===')
+    print('=== Generating font assets (res/fonts/*) ===')
     gen_font.main()
     print()
     print('=== Generating sprite assets (res/sprites/*) ===')

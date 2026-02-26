@@ -8,11 +8,11 @@
 #define FONT_TILE_COUNT    101U
 #define FONT_PALETTE_COUNT 1U
 
-#define FONT_TILE_SPADE  96U  /* tile offset for ♠ spade */
-#define FONT_TILE_CLUB  97U  /* tile offset for ♣ club */
-#define FONT_TILE_HEART  98U  /* tile offset for ♥ heart (use HUD_RED_PALETTE_SLOT for red) */
-#define FONT_TILE_DIAMOND  99U  /* tile offset for ♦ diamond */
-#define FONT_TILE_CURSOR  100U  /* tile offset for ► cursor */
+#define FONT_TILE_SPADE  96U  /* tile offset for spade */
+#define FONT_TILE_CLUB  97U  /* tile offset for club */
+#define FONT_TILE_HEART  98U  /* tile offset for heart (use HUD_RED_PALETTE_SLOT for red) */
+#define FONT_TILE_DIAMOND  99U  /* tile offset for diamond */
+#define FONT_TILE_CURSOR  100U  /* tile offset for cursor */
 
 extern const palette_color_t font_palettes[4];
 extern const uint8_t font_tiles[1616];

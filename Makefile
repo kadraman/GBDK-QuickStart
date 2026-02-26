@@ -46,13 +46,19 @@ LCCFLAGS   += -Wl-j
 
 BINS        = $(OBJDIR)/$(PROJECTNAME).gbc
 
-SRCSRC      = $(wildcard $(SRCDIR)/*.c)
+# Source directories (split library vs game-specific folders)
+SRCDIRS     = $(SRCDIR)/lib/src $(SRCDIR)/game $(SRCDIR)/game/states $(SRCDIR)/game/sprites
+SRCSRC      = $(foreach d,$(SRCDIRS),$(wildcard $(d)/*.c))
 RESSRC      = $(wildcard $(RESDIR)/*.c)
 ALLSRC      = $(SRCSRC) $(RESSRC)
 OBJS        = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCSRC)) \
-              $(patsubst $(RESDIR)/%.c,$(OBJDIR)/%.o,$(RESSRC))
+			  $(patsubst $(RESDIR)/%.c,$(OBJDIR)/%.o,$(RESSRC))
 
-PNG_ASSETS  = $(RESDIR)/background.png $(RESDIR)/font.png $(RESDIR)/player.png
+# Include search paths for lcc
+INCLUDES    = -I$(SRCDIR)/lib/include -I$(SRCDIR)/game -I$(SRCDIR)/game/states -I$(SRCDIR)/game/sprites -I$(RESDIR)
+
+PNG_ASSETS  = $(RESDIR)/background.png $(RESDIR)/font.png $(RESDIR)/player.png $(RESDIR)/enemy.png \
+              $(RESDIR)/bg_title.png $(RESDIR)/bg_gameover.png $(RESDIR)/bg_win.png
 
 .PHONY: all generate convert clean clean-generated run
 
@@ -65,15 +71,19 @@ generate:
 
 # Convert PNG assets to GBDK-compatible C source files using png2asset.
 convert:
-	$(PNG2ASSET) $(RESDIR)/background.png -c $(RESDIR)/background.c -map -bpp 2 -max_palettes 2
-	$(PNG2ASSET) $(RESDIR)/font.png       -c $(RESDIR)/font.c       -map -bpp 2 -max_palettes 1
-	$(PNG2ASSET) $(RESDIR)/player.png     -c $(RESDIR)/player.c          -bpp 2 -max_palettes 1 -spr8x16 -sw 8 -sh 16
+	$(PNG2ASSET) $(RESDIR)/background.png  -c $(RESDIR)/background.c  -map -bpp 2 -max_palettes 2
+	$(PNG2ASSET) $(RESDIR)/bg_title.png    -c $(RESDIR)/bg_title.c    -map -bpp 2 -max_palettes 2
+	$(PNG2ASSET) $(RESDIR)/bg_gameover.png -c $(RESDIR)/bg_gameover.c -map -bpp 2 -max_palettes 2
+	$(PNG2ASSET) $(RESDIR)/bg_win.png      -c $(RESDIR)/bg_win.c      -map -bpp 2 -max_palettes 2
+	$(PNG2ASSET) $(RESDIR)/font.png        -c $(RESDIR)/font.c        -map -bpp 2 -max_palettes 1
+	$(PNG2ASSET) $(RESDIR)/player.png      -c $(RESDIR)/player.c           -bpp 2 -max_palettes 1 -spr8x16 -sw 8 -sh 16
+	$(PNG2ASSET) $(RESDIR)/enemy.png       -c $(RESDIR)/enemy.c            -bpp 2 -max_palettes 1 -spr8x8  -sw 8 -sh 8
 
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
-	$(LCC) $(LCCFLAGS) -c -o $@ $<
+	$(LCC) $(LCCFLAGS) $(INCLUDES) -c -o $@ $<
 
 $(OBJDIR)/%.o: $(RESDIR)/%.c | $(OBJDIR)
 	$(LCC) $(LCCFLAGS) -c -o $@ $<
@@ -98,5 +108,6 @@ clean:
 # Remove only build artifacts; use `make clean-generated` to remove generated
 # asset sources in `res/` (background, font, sprite).
 clean-generated:
-	# Remove generated asset sources in res/ (background, font, sprite)
-	rm -f $(RESDIR)/background.* $(RESDIR)/font.* $(RESDIR)/player.*
+	# Remove generated asset sources in res/ (backgrounds, fonts, sprites)
+	rm -f $(RESDIR)/background.* $(RESDIR)/bg_title.* $(RESDIR)/bg_gameover.* $(RESDIR)/bg_win.*
+	rm -f $(RESDIR)/font.* $(RESDIR)/player.* $(RESDIR)/enemy.*
