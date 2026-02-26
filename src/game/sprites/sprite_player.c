@@ -30,12 +30,12 @@
  * Matches the pit definitions in res/backgrounds/gameplay/definition.py:
  *   PIT1: cols 10-12  => world-x  80..103
  *   PIT2: cols 21-24  => world-x 168..199
- *   PIT3: cols 34-39  => world-x 272..319
+ *   PIT3: cols 34-38  => world-x 272..311
  * -------------------------------------------------------------------- */
 static const uint16_t _pits[][2] = {
     { 80U, 103U},
     {168U, 199U},
-    {272U, 319U},
+    {272U, 311U}
 };
 #define NUM_PITS  3U
 
