@@ -46,8 +46,9 @@ LCCFLAGS   += -Wl-j
 # MBC5 cartridge type (supports up to 512 ROM banks, recommended for GBC)
 LCCFLAGS   += -Wm-yt25
 # Auto banking: when a bank is full the linker automatically overflows
-# data/code into the next bank.  Code that accesses banked data must call
-# SWITCH_ROM(BANK(symbol)) / SWITCH_ROM(1) around each access.
+# data/code into the next bank.  Code that accesses banked data must save
+# the current bank, call SWITCH_ROM(BANK(symbol)) before the access, then
+# restore the saved bank with SWITCH_ROM(save_bank) afterwards.
 LCCFLAGS   += -Wm-ybo
 
 BINS        = $(OBJDIR)/$(PROJECTNAME).gbc
@@ -89,9 +90,11 @@ $(OBJDIR):
 	mkdir -p $(OBJDIR)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	@mkdir -p $(dir $@)
 	$(LCC) $(LCCFLAGS) $(INCLUDES) -c -o $@ $<
 
 $(OBJDIR)/%.o: $(RESDIR)/%.c | $(OBJDIR)
+	@mkdir -p $(dir $@)
 	$(LCC) $(LCCFLAGS) -c -o $@ $<
 
 $(BINS): $(OBJS)

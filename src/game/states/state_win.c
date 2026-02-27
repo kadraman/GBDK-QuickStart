@@ -22,9 +22,13 @@ static uint8_t prev_joy;
 
 static void win_init(void)
 {
+    uint8_t save_bank;
     prev_joy = 0;
 
-    /* Switch to asset bank before loading ROM data into VRAM/palettes. */
+    /* Switch to asset bank before loading ROM data into VRAM/palettes.
+     * Save _current_bank so the restore is correct regardless of which
+     * bank this function is executing from. */
+    save_bank = _current_bank;
     SWITCH_ROM(BANK(bg_win_tiles));
 
     /* Load win background tiles into VRAM slot 0 */
@@ -43,8 +47,7 @@ static void win_init(void)
     set_bkg_tiles(0, 0, BG_WIN_MAP_WIDTH, BG_WIN_MAP_HEIGHT, bg_win_attr_map);
     VBK_REG = 0;
 
-    /* Restore game code bank */
-    SWITCH_ROM(1);
+    SWITCH_ROM(save_bank);
 
     SCX_REG = 0;
     SCY_REG = 0;

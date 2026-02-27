@@ -208,29 +208,47 @@ extern const uint8_t bg_title_tiles[];
 
 Before calling any GBDK function that dereferences a pointer into the banked
 area (e.g. `set_bkg_data`, `set_sprite_data`, `set_bkg_palette`,
-`set_bkg_tiles`), switch to the asset bank and restore afterwards:
+`set_bkg_tiles`), save the current bank, switch to the asset bank, and restore
+the saved bank afterwards:
 
 ```c
-/* switch to the bank containing the asset */
-SWITCH_ROM(BANK(bg_title_tiles));
+uint8_t save_bank = _current_bank;   /* save caller's bank */
+SWITCH_ROM(BANK(bg_title_tiles));    /* switch to asset bank */
 
 set_bkg_data(0, BG_TITLE_TILE_COUNT, bg_title_tiles);
 set_bkg_data(BG_TITLE_TILE_COUNT, FONT_TILE_COUNT, font_tiles);
 set_bkg_palette(0, BG_TITLE_PALETTE_COUNT, bg_title_palettes);
 
-/* restore the game-code bank (bank 1) */
-SWITCH_ROM(1);
+SWITCH_ROM(save_bank);               /* restore caller's bank */
 ```
 
-> **Why `SWITCH_ROM(1)` to restore?**  All game-logic source files are
-> compiled without a `#pragma bank` pragma, so the linker places them in
-> bank 1 by default.  If your project grows and game code overflows to bank 2,
-> replace the restore call with `SWITCH_ROM(BANK(some_function_symbol))` or
-> track the current bank with a variable.
+Saving `_current_bank` (the GBDK-maintained variable tracking the active bank)
+and restoring it is safer than hardcoding `SWITCH_ROM(1)`, because it stays
+correct if the calling code itself ever overflows to a higher bank.
 
 All state `init()` functions and `main()` already follow this pattern.  The
 streaming helper `load_bg_column()` in `state_gameplay.c` also performs its
-own `SWITCH_ROM` pair so it is safe to call from any bank context.
+own save/restore so it is safe to call from any bank context.
+
+### What "auto-banking" means — and what it does not
+
+**The linker is automatic; runtime bank switching is not.**
+
+- `#pragma bank 1` and `-Wm-ybo` tell the *linker* to assign asset data to
+  ROM bank 1, and to automatically overflow into bank 2, 3, … when a bank is
+  full — you never need to edit a linker script or track bank sizes manually.
+
+- However, the GBC hardware always executes code from a single visible bank
+  at a time. Whenever your code needs to read data that lives in a *different*
+  bank, it must explicitly call `SWITCH_ROM`. There is no CPU-level mechanism
+  that makes this automatic.
+
+- The `BANK(symbol)` macro resolves the correct bank number at link time, so
+  `SWITCH_ROM(BANK(symbol))` is always correct even after overflow — no manual
+  number tracking is required.
+
+To summarise: *bank assignment* is automatic (linker), *bank switching* is
+explicit (your code), but the `BANK()` macro means you never hardcode a number.
 
 ### Guidelines for adding new assets
 
@@ -245,19 +263,21 @@ own `SWITCH_ROM` pair so it is safe to call from any bank context.
    infrastructure handles the rest.
 
 3. **When loading the asset** (usually in a state's `init()` function), wrap
-   the GBDK calls with:
+   the GBDK calls with save/restore:
    ```c
+   uint8_t save_bank = _current_bank;
    SWITCH_ROM(BANK(my_new_tiles));
    set_bkg_data(..., my_new_tiles);
    /* ... other loads from the same bank ... */
-   SWITCH_ROM(1);
+   SWITCH_ROM(save_bank);
    ```
 
-4. **Watch bank 1 capacity (~32 KB)**. If you add many large assets or a
-   significant amount of game code, bank 1 may fill up. When `-Wm-ybo` overflows
-   data to bank 2, the `BANK(symbol)` macro returns 2 automatically, so
-   `SWITCH_ROM(BANK(symbol))` remains correct.  The only additional work is to
-   ensure the restore call matches the bank that code is executing from.
+4. **Watch bank 1 capacity (~16 KB / 0x4000 bytes)**. If you add many large
+   assets or a significant amount of game code, bank 1 may fill up. When
+   `-Wm-ybo` overflows data to bank 2, the `BANK(symbol)` macro returns 2
+   automatically, so `SWITCH_ROM(BANK(symbol))` remains correct with no
+   manual updates needed.  The `save_bank` / restore pattern means calling
+   code does not need to know which bank it is executing from.
 
 5. **Functions that read banked data every frame** (like `load_bg_column`)
    should call `SWITCH_ROM` internally rather than relying on the caller to do

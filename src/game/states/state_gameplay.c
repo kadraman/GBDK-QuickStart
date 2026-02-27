@@ -64,13 +64,13 @@ static uint8_t  bg_stream_right;   /* next column to stream into the ring buffer
  * a 48x18 level map in ROM and stream one column at a time into the
  * ring buffer as the camera scrolls right.
  *
- * Banking note: bg_gameplay_map and bg_gameplay_attr_map live in ROM
- * bank 1 (asset bank).  SWITCH_ROM is called here so the function
- * remains correct if auto-banking eventually places these arrays in a
- * bank other than the one containing this code.
+ * Banking note: bg_gameplay_map and bg_gameplay_attr_map live in the
+ * asset bank.  _current_bank is saved before switching and restored
+ * afterwards so the function is safe to call from any bank context.
  * -------------------------------------------------------------------- */
 static void load_bg_column(uint8_t level_col)
 {
+    uint8_t save_bank = _current_bank;
     uint8_t bg_col = (uint8_t)(level_col % 32U);
     uint8_t row;
 
@@ -88,7 +88,7 @@ static void load_bg_column(uint8_t level_col)
     }
     VBK_REG = 0;
 
-    SWITCH_ROM(1);
+    SWITCH_ROM(save_bank);
 }
 
 /* -----------------------------------------------------------------------
@@ -205,6 +205,7 @@ static void hud_init(void)
 static void gameplay_init(void)
 {
     uint8_t col;
+    uint8_t save_bank;
 
     camera_x           = 0;
     score              = 0;
@@ -218,7 +219,9 @@ static void gameplay_init(void)
     sprite_manager_init();
 
     /* Switch to asset bank before loading ROM data into VRAM/palettes.
-     * load_bg_column() also calls SWITCH_ROM internally. */
+     * Save _current_bank so the restore is correct regardless of which
+     * bank this function is executing from. */
+    save_bank = _current_bank;
     SWITCH_ROM(BANK(bg_gameplay_tiles));
 
     /* Load gameplay background tiles (slot 0..BG_GAMEPLAY_TILE_COUNT-1) */
@@ -231,8 +234,7 @@ static void gameplay_init(void)
     /* Font palette: sky-blue background, black text (slot 2) */
     set_bkg_palette(2, 1, gameplay_font_palette);
 
-    /* Restore game code bank */
-    SWITCH_ROM(1);
+    SWITCH_ROM(save_bank);
 
     /* Player: 16x16 -> 2 OBJ slots */
     player_init(20U, 64U, 0U);
@@ -241,7 +243,7 @@ static void gameplay_init(void)
     enemy_init(80U, 72U, PLAYER_TILE_COUNT);
 
     /* Load initial 32 columns into hardware background ring buffer.
-     * load_bg_column() handles its own bank switch internally. */
+     * load_bg_column() handles its own bank save/restore internally. */
     for (col = 0; col < 32U; col++) {
         load_bg_column(col);
     }

@@ -41,6 +41,7 @@ static const palette_color_t hud_red_palette[4] = {
 };
 
 void main(void) {
+    uint8_t save_bank;
     DISPLAY_OFF;
 
     /* --- GBC background palettes shared across all states --- */
@@ -49,24 +50,23 @@ void main(void) {
     /* Slot 4: HUD red palette (red text on dark background – lives hearts) */
     set_bkg_palette(4, 1, hud_red_palette);
 
-    /* --- Switch to asset bank and load sprite data ---
-     * player_tiles and enemy_tiles are in bank 1 (#pragma bank 1).
-     * BANK() resolves the correct bank at link time so this stays correct
-     * even if auto-banking places these arrays in a higher bank later. */
+    /* --- Switch to each asset's bank and load sprite data ---
+     * BANK() resolves the actual bank at link time.  Saving _current_bank
+     * first and restoring it afterwards keeps the pattern correct even if
+     * auto-banking eventually places these assets in different banks. */
+    save_bank = _current_bank;
+
+    /* Slot 0: player palette + tiles */
     SWITCH_ROM(BANK(player_tiles));
-
-    /* --- GBC sprite palettes --- */
-    /* Slot 0: player palette */
     set_sprite_palette(0, PLAYER_PALETTE_COUNT, player_palettes);
-    /* Slot 1: enemy palette */
-    set_sprite_palette(1, ENEMY_PALETTE_COUNT, enemy_palettes);
-
-    /* --- Load sprite tiles (persists across all states) --- */
     set_sprite_data(0, PLAYER_TILE_COUNT, player_tiles);
+
+    /* Slot 1: enemy palette + tiles (may be in a different bank than player) */
+    SWITCH_ROM(BANK(enemy_tiles));
+    set_sprite_palette(1, ENEMY_PALETTE_COUNT, enemy_palettes);
     set_sprite_data(PLAYER_TILE_COUNT, ENEMY_TILE_COUNT, enemy_tiles);
 
-    /* Restore game code bank */
-    SWITCH_ROM(1);
+    SWITCH_ROM(save_bank);
 
     /* Use 8x16 sprite mode */
     SPRITES_8x16;
