@@ -309,6 +309,29 @@ TILEMAP_FLAT = _build_tilemap()
 assert len(TILEMAP_FLAT) == MAP_W * MAP_H
 
 # ---------------------------------------------------------------------------
+# Collideable tile IDs  (landing / top-surface collision)
+# A sprite falling onto any of these tile IDs will be stopped and snapped to
+# the top of that tile.  Includes one-way platforms (tile 15) which only
+# block from above.
+#   12 = Grass top   (ground surface)
+#   13 = Dirt        (subsurface)
+#   14 = Deep ground (bottom fill)
+#   15 = Platform block (stone ledge – one-way, top surface only)
+# ---------------------------------------------------------------------------
+COLLISION_TILE_IDS = [12, 13, 14, 15]
+
+# ---------------------------------------------------------------------------
+# Solid tile IDs  (full directional collision)
+# These tiles block sprites from ALL directions (left, right, above, below).
+# Platform blocks (15) are intentionally excluded so that sprites can walk
+# past them at ground level and jump up through them from below.
+#   12 = Grass top
+#   13 = Dirt
+#   14 = Deep ground
+# ---------------------------------------------------------------------------
+SOLID_TILE_IDS = [12, 13, 14]
+
+# ---------------------------------------------------------------------------
 # Per-tile palette attribute map
 # ---------------------------------------------------------------------------
 ATTR_MAP = []
