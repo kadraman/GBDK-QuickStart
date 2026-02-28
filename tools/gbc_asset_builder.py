@@ -135,17 +135,20 @@ def _format_palette_array(palette_rows, colors_per_row=4):
 
 def write_background_files(name, tiles, tilemap, palette_colors,
                             map_width, map_height, out_dir='.', attr_map=None,
+                            collision_tile_ids=None,
                             generator='gen_background.py'):
     """Write background .c and .h files.
 
-    name           : base name, e.g. 'background'.
-    tiles          : list of 8x8 pixel tiles.
-    tilemap        : flat list of tile indices (map_width * map_height).
-    palette_colors : (r,g,b) tuples, length == n_palettes * 4.
-    map_width/height : tilemap dimensions in tiles.
-    attr_map       : optional flat list of per-tile palette attribute bytes.
-                     When provided, exported as <name>_attr_map[].
-    generator      : name of the generator script (used in file header comment).
+    name               : base name, e.g. 'background'.
+    tiles              : list of 8x8 pixel tiles.
+    tilemap            : flat list of tile indices (map_width * map_height).
+    palette_colors     : (r,g,b) tuples, length == n_palettes * 4.
+    map_width/height   : tilemap dimensions in tiles.
+    attr_map           : optional flat list of per-tile palette attribute bytes.
+                         When provided, exported as <name>_attr_map[].
+    collision_tile_ids : optional list of tile IDs treated as solid/collideable.
+                         When provided, exported as <name>_collision_tiles[].
+    generator          : name of the generator script (used in file header comment).
     """
     tile_count      = len(tiles)
     palette_count   = len(palette_colors) // 4
@@ -184,6 +187,16 @@ def write_background_files(name, tiles, tilemap, palette_colors,
             _format_c_bytes(attr_map),
             '};',
         ]
+    if collision_tile_ids is not None:
+        n_coll = len(collision_tile_ids)
+        c_lines += [
+            '',
+            f'/* Collideable tile IDs ({n_coll} entries).',
+            f'   Sprites that overlap these tile IDs are considered to be touching solid ground. */',
+            f'const uint8_t {name}_collision_tiles[{n_coll}] = {{',
+            _format_c_bytes(collision_tile_ids),
+            '};',
+        ]
 
     c_path = os.path.join(out_dir, f'{name}.c')
     with open(c_path, 'w', encoding='utf-8') as f:
@@ -211,6 +224,12 @@ def write_background_files(name, tiles, tilemap, palette_colors,
     if attr_map is not None:
         n_attr = len(attr_map)
         h_lines.append(f'extern const uint8_t {name}_attr_map[{n_attr}];')
+    if collision_tile_ids is not None:
+        n_coll = len(collision_tile_ids)
+        h_lines += [
+            f'#define {NAME}_COLLISION_TILE_COUNT {n_coll}U',
+            f'extern const uint8_t {name}_collision_tiles[{n_coll}];',
+        ]
     h_lines += ['', '#endif']
 
     h_path = os.path.join(out_dir, f'{name}.h')

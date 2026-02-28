@@ -14,5 +14,7 @@ extern const palette_color_t bg_gameplay_palettes[8];
 extern const uint8_t bg_gameplay_tiles[256];
 extern const uint8_t bg_gameplay_map[864];
 extern const uint8_t bg_gameplay_attr_map[864];
+#define BG_GAMEPLAY_COLLISION_TILE_COUNT 4U
+extern const uint8_t bg_gameplay_collision_tiles[4];
 
 #endif

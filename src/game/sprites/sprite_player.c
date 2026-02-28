@@ -6,6 +6,7 @@
 #include "sprite_manager.h"
 #include "sprite_player.h"
 #include "player.h"
+#include "bg_gameplay.h"
 
 /* -----------------------------------------------------------------------
  * Player physics constants
@@ -26,34 +27,13 @@
 #define MAX_FALL_WORLD_Y 160U   /* world_y at which player is dead       */
 
 /* -----------------------------------------------------------------------
- * Pit zones: world-x ranges with no ground floor.
- * Matches the pit definitions in res/backgrounds/gameplay/definition.py:
- *   PIT1: cols 10-12  => world-x  80..103
- *   PIT2: cols 21-24  => world-x 168..199
- *   PIT3: cols 34-38  => world-x 272..311
+ * Tilemap row indices for ground and platform collision checks.
+ * These match the rows defined in res/backgrounds/gameplay/definition.py:
+ *   row 10 = grass top (ground surface)
+ *   row  9 = platform block row
  * -------------------------------------------------------------------- */
-static const uint16_t _pits[][2] = {
-    { 80U, 103U},
-    {168U, 199U},
-    {272U, 311U}
-};
-#define NUM_PITS  3U
-
-/* -----------------------------------------------------------------------
- * Platform zones: world-x ranges with a raised platform.
- * Matches the platform definitions in res/backgrounds/gameplay/definition.py:
- *   PLAT1: col 7      => world-x  56..63
- *   PLAT2: cols 15-16 => world-x 120..135
- *   PLAT3: cols 27-28 => world-x 216..231
- *   PLAT4: col 42     => world-x 336..343
- * -------------------------------------------------------------------- */
-static const uint16_t _platforms[][2] = {
-    { 56U,  63U},
-    {120U, 135U},
-    {216U, 231U},
-    {336U, 343U},
-};
-#define NUM_PLATFORMS  4U
+#define GROUND_TILE_ROW   10U
+#define PLATFORM_TILE_ROW  9U
 
 typedef enum { PSTATE_IDLE, PSTATE_WALK, PSTATE_JUMP } PlayerState;
 
@@ -65,26 +45,28 @@ static PlayerState  _player_state;
 static uint8_t      _on_platform;
 static uint8_t      _gravity_delay_ctr;
 
-/* Returns 1 if world_x is over a pit (no ground). */
+/* Returns 1 if world_x is over a pit (no solid tile at the ground-level row). */
 static uint8_t _over_pit(uint16_t wx)
 {
+    uint8_t tile;
     uint8_t i;
-    for (i = 0U; i < NUM_PITS; i++) {
-        if (wx >= _pits[i][0] && wx <= _pits[i][1]) {
-            return 1U;
-        }
+    tile = sprite_manager_tile_at(
+        wx, GROUND_TILE_ROW, bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH);
+    for (i = 0U; i < BG_GAMEPLAY_COLLISION_TILE_COUNT; i++) {
+        if (bg_gameplay_collision_tiles[i] == tile) return 0U;
     }
-    return 0U;
+    return 1U;
 }
 
-/* Returns 1 if world_x is over a platform, 0 otherwise. */
+/* Returns 1 if world_x is over a platform tile at the platform row. */
 static uint8_t _over_platform(uint16_t wx)
 {
+    uint8_t tile;
     uint8_t i;
-    for (i = 0U; i < NUM_PLATFORMS; i++) {
-        if (wx >= _platforms[i][0] && wx <= _platforms[i][1]) {
-            return 1U;
-        }
+    tile = sprite_manager_tile_at(
+        wx, PLATFORM_TILE_ROW, bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH);
+    for (i = 0U; i < BG_GAMEPLAY_COLLISION_TILE_COUNT; i++) {
+        if (bg_gameplay_collision_tiles[i] == tile) return 1U;
     }
     return 0U;
 }

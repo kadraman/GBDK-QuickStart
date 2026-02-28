@@ -55,14 +55,15 @@ def process_definition(defn_path):
     """Generate .png, .c, and .h for one background definition file."""
     mod = _load_definition(defn_path)
 
-    name           = mod.NAME
-    tiles          = mod.TILES
-    tilemap_flat   = mod.TILEMAP_FLAT
-    palette_colors = mod.PALETTE_COLORS
-    png_palette    = mod.PNG_PALETTE
-    map_w          = mod.MAP_W
-    map_h          = mod.MAP_H
-    attr_map       = mod.ATTR_MAP
+    name               = mod.NAME
+    tiles              = mod.TILES
+    tilemap_flat       = mod.TILEMAP_FLAT
+    palette_colors     = mod.PALETTE_COLORS
+    png_palette        = mod.PNG_PALETTE
+    map_w              = mod.MAP_W
+    map_h              = mod.MAP_H
+    attr_map           = mod.ATTR_MAP
+    collision_tile_ids = getattr(mod, 'COLLISION_TILE_IDS', None)
 
     out_dir = os.path.join(REPO_ROOT, 'res')
     os.makedirs(out_dir, exist_ok=True)
@@ -89,6 +90,7 @@ def process_definition(defn_path):
         map_height=map_h,
         out_dir=out_dir,
         attr_map=attr_map,
+        collision_tile_ids=collision_tile_ids,
         generator='gen_background.py',
     )
 

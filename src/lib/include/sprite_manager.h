@@ -63,4 +63,41 @@ void sprite_manager_update_hw(const Sprite *s, uint8_t camera_x, uint8_t camera_
  * ----------------------------------------------------------------------- */
 Sprite* sprite_manager_first_collision(const Sprite *s);
 
+/* -----------------------------------------------------------------------
+ * sprite_manager_tile_at
+ * Look up the tile ID at a world-pixel X and tile-row Y in a ROM tilemap.
+ *
+ * world_x16 : full 16-bit world X coordinate in pixels
+ * tile_row  : map row index (0 = top of map)
+ * tilemap   : flat row-major tilemap array (stored in ROM)
+ * map_width : map width in tiles
+ *
+ * Returns the tile ID, or 0 if the column is out of bounds.
+ * ----------------------------------------------------------------------- */
+uint8_t sprite_manager_tile_at(uint16_t world_x16, uint8_t tile_row,
+                                const uint8_t *tilemap, uint8_t map_width);
+
+/* -----------------------------------------------------------------------
+ * sprite_manager_tile_collision
+ * Check whether a sprite's AABB overlaps any tile whose ID appears in the
+ * collide_tiles list.  Uses hitbox_x/y/w/h if set; otherwise falls back
+ * to the full sprite dimensions.
+ *
+ * world_x16        : full 16-bit world X of the sprite's left edge
+ * tilemap          : flat row-major tilemap array (stored in ROM)
+ * map_width        : map width in tiles
+ * map_height       : map height in tiles
+ * collide_tiles    : array of tile IDs treated as solid/collideable
+ * num_collide_tiles: number of entries in collide_tiles
+ *
+ * Returns 1 if the sprite overlaps a collideable tile, 0 otherwise.
+ * ----------------------------------------------------------------------- */
+uint8_t sprite_manager_tile_collision(const Sprite  *s,
+                                       uint16_t       world_x16,
+                                       const uint8_t *tilemap,
+                                       uint8_t        map_width,
+                                       uint8_t        map_height,
+                                       const uint8_t *collide_tiles,
+                                       uint8_t        num_collide_tiles);
+
 #endif

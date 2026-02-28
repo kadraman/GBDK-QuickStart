@@ -309,6 +309,17 @@ TILEMAP_FLAT = _build_tilemap()
 assert len(TILEMAP_FLAT) == MAP_W * MAP_H
 
 # ---------------------------------------------------------------------------
+# Collideable tile IDs
+# Tiles listed here are treated as solid by the sprite–tile collision system.
+# Any background tile whose index appears in this list will block sprites.
+#   12 = Grass top   (ground surface)
+#   13 = Dirt        (subsurface)
+#   14 = Deep ground (bottom fill)
+#   15 = Platform block (stone ledge the player can land on)
+# ---------------------------------------------------------------------------
+COLLISION_TILE_IDS = [12, 13, 14, 15]
+
+# ---------------------------------------------------------------------------
 # Per-tile palette attribute map
 # ---------------------------------------------------------------------------
 ATTR_MAP = []
