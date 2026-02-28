@@ -64,6 +64,7 @@ def process_definition(defn_path):
     map_h              = mod.MAP_H
     attr_map           = mod.ATTR_MAP
     collision_tile_ids = getattr(mod, 'COLLISION_TILE_IDS', None)
+    solid_tile_ids     = getattr(mod, 'SOLID_TILE_IDS',     None)
 
     out_dir = os.path.join(REPO_ROOT, 'res')
     os.makedirs(out_dir, exist_ok=True)
@@ -91,6 +92,7 @@ def process_definition(defn_path):
         out_dir=out_dir,
         attr_map=attr_map,
         collision_tile_ids=collision_tile_ids,
+        solid_tile_ids=solid_tile_ids,
         generator='gen_background.py',
     )
 

@@ -145,7 +145,13 @@ const uint8_t bg_gameplay_attr_map[864] = {
 };
 
 /* Collideable tile IDs (4 entries).
-   Sprites that overlap these tile IDs are considered to be touching solid ground. */
+   Sprites landing on (falling onto) these tile IDs are stopped. */
 const uint8_t bg_gameplay_collision_tiles[4] = {
     0x0CU, 0x0DU, 0x0EU, 0x0FU
+};
+
+/* Solid tile IDs (3 entries).
+   These tiles block sprites from all directions (left, right, above, below). */
+const uint8_t bg_gameplay_solid_tiles[3] = {
+    0x0CU, 0x0DU, 0x0EU
 };

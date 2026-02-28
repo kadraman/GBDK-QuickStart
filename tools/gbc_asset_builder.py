@@ -136,6 +136,7 @@ def _format_palette_array(palette_rows, colors_per_row=4):
 def write_background_files(name, tiles, tilemap, palette_colors,
                             map_width, map_height, out_dir='.', attr_map=None,
                             collision_tile_ids=None,
+                            solid_tile_ids=None,
                             generator='gen_background.py'):
     """Write background .c and .h files.
 
@@ -146,10 +147,25 @@ def write_background_files(name, tiles, tilemap, palette_colors,
     map_width/height   : tilemap dimensions in tiles.
     attr_map           : optional flat list of per-tile palette attribute bytes.
                          When provided, exported as <name>_attr_map[].
-    collision_tile_ids : optional list of tile IDs treated as solid/collideable.
+    collision_tile_ids : optional list of tile IDs for landing (top-surface) collision.
                          When provided, exported as <name>_collision_tiles[].
+    solid_tile_ids     : optional list of tile IDs that block from all directions.
+                         When provided, exported as <name>_solid_tiles[].
     generator          : name of the generator script (used in file header comment).
     """
+    def _normalize_tile_ids(ids, param_name):
+        """Return a non-empty validated list, or None to skip emission."""
+        if ids is None:
+            return None
+        cleaned = [int(t) for t in ids]
+        for t in cleaned:
+            if t < 0 or t > 255:
+                raise ValueError(
+                    f"{param_name} entry {t} is outside uint8_t range (0-255)")
+        return cleaned if cleaned else None
+
+    collision_tile_ids = _normalize_tile_ids(collision_tile_ids, 'collision_tile_ids')
+    solid_tile_ids     = _normalize_tile_ids(solid_tile_ids,     'solid_tile_ids')
     tile_count      = len(tiles)
     palette_count   = len(palette_colors) // 4
     tile_bytes      = tiles_to_2bpp_bytes(tiles)
@@ -192,9 +208,19 @@ def write_background_files(name, tiles, tilemap, palette_colors,
         c_lines += [
             '',
             f'/* Collideable tile IDs ({n_coll} entries).',
-            f'   Sprites that overlap these tile IDs are considered to be touching solid ground. */',
+            f'   Sprites landing on (falling onto) these tile IDs are stopped. */',
             f'const uint8_t {name}_collision_tiles[{n_coll}] = {{',
             _format_c_bytes(collision_tile_ids),
+            '};',
+        ]
+    if solid_tile_ids is not None:
+        n_solid = len(solid_tile_ids)
+        c_lines += [
+            '',
+            f'/* Solid tile IDs ({n_solid} entries).',
+            f'   These tiles block sprites from all directions (left, right, above, below). */',
+            f'const uint8_t {name}_solid_tiles[{n_solid}] = {{',
+            _format_c_bytes(solid_tile_ids),
             '};',
         ]
 
@@ -229,6 +255,12 @@ def write_background_files(name, tiles, tilemap, palette_colors,
         h_lines += [
             f'#define {NAME}_COLLISION_TILE_COUNT {n_coll}U',
             f'extern const uint8_t {name}_collision_tiles[{n_coll}];',
+        ]
+    if solid_tile_ids is not None:
+        n_solid = len(solid_tile_ids)
+        h_lines += [
+            f'#define {NAME}_SOLID_TILE_COUNT {n_solid}U',
+            f'extern const uint8_t {name}_solid_tiles[{n_solid}];',
         ]
     h_lines += ['', '#endif']
 

@@ -21,19 +21,9 @@
 #define SCROLL_L_LIMIT    60U   /* scroll left  when screen-X falls below */
 #define MAX_SCROLL_X     224U   /* max camera_x: (48-20)*8 = 224         */
 
-/* Sprite Y constants (world_y = screen top of sprite; OAM Y = world_y+16) */
-#define GROUND_WORLD_Y    64U   /* world_y standing on ground floor      */
-#define PLATFORM_WORLD_Y  40U   /* world_y standing on a raised platform */
-#define MAX_FALL_WORLD_Y 160U   /* world_y at which player is dead       */
-
-/* -----------------------------------------------------------------------
- * Tilemap row indices for ground and platform collision checks.
- * These match the rows defined in res/backgrounds/gameplay/definition.py:
- *   row 10 = grass top (ground surface)
- *   row  9 = platform block row
- * -------------------------------------------------------------------- */
-#define GROUND_TILE_ROW   10U
-#define PLATFORM_TILE_ROW  9U
+/* Sprite Y constants */
+#define GROUND_WORLD_Y    64U   /* initial world_y when spawned on ground */
+#define MAX_FALL_WORLD_Y 160U   /* world_y at which player is considered dead */
 
 typedef enum { PSTATE_IDLE, PSTATE_WALK, PSTATE_JUMP } PlayerState;
 
@@ -42,29 +32,25 @@ static uint16_t     _player_world_x16;   /* full 16-bit world X position  */
 static int8_t       _player_vy;
 static uint8_t      _player_facing_r;
 static PlayerState  _player_state;
-static uint8_t      _on_platform;
 static uint8_t      _gravity_delay_ctr;
 
-/* Returns 1 if world_x is over a pit (no solid tile at the ground-level row). */
-static uint8_t _over_pit(uint16_t wx)
+/* -----------------------------------------------------------------------
+ * _has_ground_below
+ * Returns 1 if there is a collideable tile directly beneath the player's
+ * feet.  The tile row is derived dynamically from world_y + sprite height,
+ * so this works correctly at any elevation (ground or platform).
+ * -------------------------------------------------------------------- */
+static uint8_t _has_ground_below(uint8_t world_y, uint16_t world_x16)
 {
+    uint8_t feet_y;
+    uint8_t tile_row;
     uint8_t tile;
     uint8_t i;
-    tile = sprite_manager_tile_at(
-        wx, GROUND_TILE_ROW, bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH);
-    for (i = 0U; i < BG_GAMEPLAY_COLLISION_TILE_COUNT; i++) {
-        if (bg_gameplay_collision_tiles[i] == tile) return 0U;
-    }
-    return 1U;
-}
 
-/* Returns 1 if world_x is over a platform tile at the platform row. */
-static uint8_t _over_platform(uint16_t wx)
-{
-    uint8_t tile;
-    uint8_t i;
-    tile = sprite_manager_tile_at(
-        wx, PLATFORM_TILE_ROW, bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH);
+    feet_y   = (uint8_t)(world_y + _player_sprite->height);
+    tile_row = (uint8_t)(feet_y >> 3);
+    tile     = sprite_manager_tile_at(
+        world_x16, tile_row, bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH);
     for (i = 0U; i < BG_GAMEPLAY_COLLISION_TILE_COUNT; i++) {
         if (bg_gameplay_collision_tiles[i] == tile) return 1U;
     }
@@ -76,7 +62,6 @@ void player_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base)
     _player_vy         = 0;
     _player_facing_r   = 1U;
     _player_state      = PSTATE_IDLE;
-    _on_platform       = 0U;
     _gravity_delay_ctr = 0U;
     _player_world_x16  = (uint16_t)start_x;
 
@@ -96,61 +81,66 @@ void player_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base)
 uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
                       uint16_t min_world_x)
 {
-    uint8_t  events  = 0U;
-    uint8_t  moved   = 0U;
-    uint16_t new_x16;
-    int16_t  new_y;
-    uint8_t  screen_x, hw_x;
-    uint8_t  tile_idx, prop;
-    uint8_t  anim_start, anim_frames;
-    uint8_t  over_pit, over_plat;
+    uint8_t     events  = 0U;
+    uint8_t     moved   = 0U;
+    int16_t     new_y;
+    uint8_t     screen_x, hw_x;
+    uint8_t     tile_idx, prop;
+    uint8_t     anim_start, anim_frames;
+    uint8_t     snap_row;
+    PlayerState next;
 
-    /* --- Horizontal movement --- */
+    /* --- Horizontal movement with solid-tile wall collision --- */
     if (joy & J_RIGHT) {
         _player_facing_r = 1U;
         if (_player_world_x16 < (uint16_t)MAX_WORLD_X) {
-            new_x16 = (uint16_t)(_player_world_x16 + WALK_SPEED);
-            _player_world_x16 = new_x16;
-            moved = 1U;
+            _player_world_x16++;
+            _player_sprite->world_x =
+                (uint8_t)(_player_world_x16 - (uint16_t)(*camera_x));
+            /* Check for wall: solid tiles block left/right/above/below */
+            if (sprite_manager_tile_collision(
+                    _player_sprite, _player_world_x16,
+                    bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
+                    bg_gameplay_solid_tiles, BG_GAMEPLAY_SOLID_TILE_COUNT)) {
+                _player_world_x16--;   /* revert */
+            } else {
+                moved = 1U;
+            }
         }
     } else if (joy & J_LEFT) {
         _player_facing_r = 0U;
         if (_player_world_x16 > min_world_x) {
-            new_x16 = (uint16_t)(_player_world_x16 - WALK_SPEED);
-            _player_world_x16 = new_x16;
-            moved = 1U;
+            _player_world_x16--;
+            _player_sprite->world_x =
+                (uint8_t)(_player_world_x16 - (uint16_t)(*camera_x));
+            if (sprite_manager_tile_collision(
+                    _player_sprite, _player_world_x16,
+                    bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
+                    bg_gameplay_solid_tiles, BG_GAMEPLAY_SOLID_TILE_COUNT)) {
+                _player_world_x16++;   /* revert */
+            } else {
+                moved = 1U;
+            }
         }
     }
 
-    /* Update sprite world_x with screen-space value (for collision) */
+    /* Sync screen-relative world_x after potential revert */
     _player_sprite->world_x =
         (uint8_t)(_player_world_x16 - (uint16_t)(*camera_x));
 
-    /* --- Jump (A or B button, only when grounded / on platform) --- */
+    /* --- Jump (A or B button, only when grounded) --- */
     if ((joy_press & J_A) || (joy_press & J_B)) {
         if (_player_state != PSTATE_JUMP) {
             _player_vy         = JUMP_VY;
             _gravity_delay_ctr = 0U;
             _player_state      = PSTATE_JUMP;
-            _on_platform       = 0U;
             events |= PLAYER_EVENT_JUMPED;
         }
     }
 
-    /* --- Determine current floor / platform --- */
-    over_pit  = _over_pit(_player_world_x16);
-    over_plat = _on_platform ? _over_platform(_player_world_x16) : 0U;
-
-    /* --- Grounded on solid floor but walked into pit: start falling --- */
-    if (_player_state != PSTATE_JUMP && !_on_platform && over_pit) {
-        _player_state      = PSTATE_JUMP;
-        _player_vy         = 0;
-        _gravity_delay_ctr = 0U;
-    }
-
-    /* --- On platform but walked off edge: start falling --- */
-    if (_on_platform && !over_plat) {
-        _on_platform       = 0U;
+    /* --- Walking off an edge: start falling when no collideable tile below --- */
+    if (_player_state != PSTATE_JUMP &&
+        !_has_ground_below(_player_sprite->world_y, _player_world_x16)) {
         _player_state      = PSTATE_JUMP;
         _player_vy         = 0;
         _gravity_delay_ctr = 0U;
@@ -161,27 +151,33 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
         new_y = (int16_t)_player_sprite->world_y + _player_vy;
         if (new_y < 0) new_y = 0;
 
-        /* Platform landing (only when falling downward) */
-        if (_player_vy > 0 && _over_platform(_player_world_x16)) {
-            if ((int16_t)_player_sprite->world_y <= (int16_t)PLATFORM_WORLD_Y &&
-                new_y >= (int16_t)PLATFORM_WORLD_Y) {
-                new_y              = (int16_t)PLATFORM_WORLD_Y;
-                _player_vy         = 0;
-                _gravity_delay_ctr = 0U;
-                _player_state      = moved ? PSTATE_WALK : PSTATE_IDLE;
-                _on_platform       = 1U;
-            }
+        _player_sprite->world_y = (uint8_t)new_y;
+
+        /* Landing from above: collideable tiles (includes one-way platforms) */
+        if (_player_vy >= 0 &&
+            sprite_manager_tile_collision(
+                _player_sprite, _player_world_x16,
+                bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
+                bg_gameplay_collision_tiles, BG_GAMEPLAY_COLLISION_TILE_COUNT)) {
+            /* Snap player to the top of the tile the feet entered */
+            snap_row = (uint8_t)(((uint8_t)new_y + _player_sprite->height) >> 3);
+            new_y = (int16_t)(snap_row * 8U) - (int16_t)_player_sprite->height;
+            _player_sprite->world_y = (uint8_t)new_y;
+            _player_vy         = 0;
+            _gravity_delay_ctr = 0U;
+            _player_state      = moved ? PSTATE_WALK : PSTATE_IDLE;
         }
 
-        /* Ground landing (not over a pit) */
-        if (_player_state == PSTATE_JUMP && _player_vy >= 0 && !over_pit) {
-            if (new_y >= (int16_t)GROUND_WORLD_Y) {
-                new_y              = (int16_t)GROUND_WORLD_Y;
-                _player_vy         = 0;
-                _gravity_delay_ctr = 0U;
-                _player_state      = moved ? PSTATE_WALK : PSTATE_IDLE;
-                _on_platform       = 0U;
-            }
+        /* Ceiling: solid tiles block upward movement */
+        if (_player_vy < 0 &&
+            sprite_manager_tile_collision(
+                _player_sprite, _player_world_x16,
+                bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
+                bg_gameplay_solid_tiles, BG_GAMEPLAY_SOLID_TILE_COUNT)) {
+            /* Snap to the bottom of the tile hit from below */
+            snap_row = (uint8_t)((uint8_t)new_y >> 3);
+            _player_sprite->world_y = (uint8_t)((snap_row + 1U) * 8U);
+            _player_vy = 1;   /* start falling */
         }
 
         /* Apply gravity every GRAVITY_DELAY frames */
@@ -193,17 +189,13 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
             }
         }
 
-        _player_sprite->world_y = (uint8_t)new_y;
-
         /* Fell off the bottom: signal event */
         if (_player_sprite->world_y >= MAX_FALL_WORLD_Y) {
             events |= PLAYER_EVENT_FELL_GAP;
         }
     } else {
-        /* On ground or platform: maintain correct Y */
-        _player_sprite->world_y = _on_platform ? PLATFORM_WORLD_Y : GROUND_WORLD_Y;
-
-        PlayerState next = moved ? PSTATE_WALK : PSTATE_IDLE;
+        /* On ground or platform: handle idle/walk state transitions */
+        next = moved ? PSTATE_WALK : PSTATE_IDLE;
         if (next != _player_state) {
             _player_state                  = next;
             _player_sprite->anim_frame     = 0U;

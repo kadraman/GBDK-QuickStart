@@ -68,11 +68,12 @@ Sprite* sprite_manager_first_collision(const Sprite *s);
  * Look up the tile ID at a world-pixel X and tile-row Y in a ROM tilemap.
  *
  * world_x16 : full 16-bit world X coordinate in pixels
- * tile_row  : map row index (0 = top of map)
- * tilemap   : flat row-major tilemap array (stored in ROM)
+ * tile_row  : map row index (0 = top of map); caller must ensure this is
+ *             within [0, map_height-1] – it is not validated internally
+ * tilemap   : flat row-major tilemap array (stored in ROM); NULL-safe (returns 0)
  * map_width : map width in tiles
  *
- * Returns the tile ID, or 0 if the column is out of bounds.
+ * Returns the tile ID, or 0 if the column is out of bounds or tilemap is NULL.
  * ----------------------------------------------------------------------- */
 uint8_t sprite_manager_tile_at(uint16_t world_x16, uint8_t tile_row,
                                 const uint8_t *tilemap, uint8_t map_width);

@@ -16,5 +16,7 @@ extern const uint8_t bg_gameplay_map[864];
 extern const uint8_t bg_gameplay_attr_map[864];
 #define BG_GAMEPLAY_COLLISION_TILE_COUNT 4U
 extern const uint8_t bg_gameplay_collision_tiles[4];
+#define BG_GAMEPLAY_SOLID_TILE_COUNT 3U
+extern const uint8_t bg_gameplay_solid_tiles[3];
 
 #endif
