@@ -54,6 +54,9 @@ ALLSRC      = $(SRCSRC) $(RESSRC)
 OBJS        = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCSRC)) \
 			  $(patsubst $(RESDIR)/%.c,$(OBJDIR)/%.o,$(RESSRC))
 
+# All object directories needed for the object files (unique)
+DIRS        = $(sort $(dir $(OBJS)))
+
 # Include search paths for lcc
 INCLUDES    = -I$(SRCDIR)/lib/include -I$(SRCDIR)/game -I$(SRCDIR)/game/states -I$(SRCDIR)/game/sprites -I$(RESDIR)
 
@@ -80,7 +83,7 @@ convert:
 	$(PNG2ASSET) $(RESDIR)/enemy.png       -c $(RESDIR)/enemy.c            -bpp 2 -max_palettes 1 -spr8x8  -sw 8 -sh 8
 
 $(OBJDIR):
-	mkdir -p $(OBJDIR)
+	mkdir -p $(OBJDIR) $(DIRS)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
 	$(LCC) $(LCCFLAGS) $(INCLUDES) -c -o $@ $<
@@ -92,7 +95,7 @@ $(BINS): $(OBJS)
 	$(LCC) $(LCCFLAGS) -o $@ $(OBJS)
 
 prepare:
-	mkdir -p $(OBJDIR)
+	mkdir -p $(OBJDIR) $(DIRS)
 
 run: $(BINS)
 ifeq ($(OS),Windows_NT)
@@ -102,11 +105,11 @@ else
 	$(EMULICIOUS) "$(BINS)" &
 endif
 
+# Remove only build artifacts; use `make clean-generated` to remove generated
+# asset sources in `res/` (background, font, sprite).
 clean:
 	rm -rf $(OBJDIR)
 
-# Remove only build artifacts; use `make clean-generated` to remove generated
-# asset sources in `res/` (background, font, sprite).
 clean-generated:
 	# Remove generated asset sources in res/ (backgrounds, fonts, sprites)
 	rm -f $(RESDIR)/background.* $(RESDIR)/bg_title.* $(RESDIR)/bg_gameover.* $(RESDIR)/bg_win.*
