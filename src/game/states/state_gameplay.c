@@ -18,8 +18,9 @@
 /* Font starts immediately after background tiles in VRAM */
 #define FONT_FIRST_TILE  BG_GAMEPLAY_TILE_COUNT
 
-/* Win condition: reached the end of the 48-tile level */
-#define CHECKPOINT_X16   360U   /* world-X >= 360 triggers win           */
+/* Win condition: reached the finish flag.  flag is one tile beyond
+ * the previous checkpoint so we must bump the world‑X accordingly.       */
+#define CHECKPOINT_X16   368U   /* world-X >= 368 triggers win           */
 
 /* HUD window */
 #define HUD_WIN_Y        112U   /* window Y: bottom 4 tile rows (32 px)  */
@@ -221,7 +222,7 @@ static void gameplay_init(void)
     player_init(20U, 64U, 0U);
 
     /* Enemy: 8x8 -> 1 OBJ slot; tile_base after player tiles */
-    enemy_init(80U, 72U, PLAYER_TILE_COUNT);
+    enemy_init(160U, 72U, PLAYER_TILE_COUNT);
 
     /* Load initial 32 columns into hardware background ring buffer */
     for (col = 0; col < 32U; col++) {
@@ -317,12 +318,21 @@ static void gameplay_update(void)
     }
 
     /* --- Column streaming (rightward only) ---
-     * Pre-load columns just off the right edge of the screen.           */
+     * Pre-load columns just off the right edge of the screen.  This
+     * can take a bunch of VRAM writes, so we stay in VBLANK long enough
+     * to finish the work.  If the loop spills past the end of the blank
+     * period the LCD will start drawing as we update the tilemap and
+     * you'll see horizontal noise lines when the camera scrolls.  Doing a
+     * second wait_vbl_done() here ensures the blank doesn’t end until the
+     * column has been pushed into VRAM.
+     */
     cam_tile   = (uint8_t)(camera_x >> 3);
     needed_col = (uint8_t)(cam_tile + 21U);
     if (needed_col < BG_GAMEPLAY_MAP_WIDTH && needed_col >= bg_stream_right) {
         load_bg_column(bg_stream_right);
         bg_stream_right++;
+        /* make sure additional work doesn’t bleed into active display */
+        wait_vbl_done();
     }
 
     prev_joy = joy;
@@ -332,7 +342,9 @@ static void gameplay_cleanup(void)
 {
     player_cleanup();
     enemy_cleanup();
-    HIDE_WIN;
+    /* don't hide the window here – leaving it visible avoids a one-frame
+       blink when the level is reset after falling.  gameover_init() and
+       state_win already hide the HUD when appropriate. */
     SCX_REG = 0;
 }
 

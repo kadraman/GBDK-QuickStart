@@ -14,9 +14,9 @@ It Includes a state-machine game loop, pre-generated 2bpp tile assets, GBC color
 - **GBC color support**: background and sprite palette setup, VRAM bank attribute writes (VBK_REG), and example HUD window palettes.
 - **Multiple named backgrounds**: One `res/backgrounds/<name>/definition.py` per state produces `res/<name>.c/.h`. States load their own tiles and palettes on `init()` to provide distinct themed visuals (night sky for title, crimson for game-over, golden for win, scrolling 48-tile level for gameplay).
 - **Multiple fonts**: Font definitions in `res/fonts/<name>/definition.py`, same auto-discovery as backgrounds and sprites.
-- **Timer HUD**: A 60-second countdown (`TIME: XX`) displayed in the HUD during gameplay; reaching zero triggers game-over.
-- **Wide pitfall level**: 48-tile (384 px) scrolling level with 3 pit zones, 4 raised platforms, and column streaming into the 32-tile hardware ring buffer.
-- **Asset tooling**: Python generators in `tools/` to produce indexed PNGs and `.c/.h` asset files; optional `png2asset` conversion via Makefile.
+- **Timer HUD**: A 60-second countdown (`TIME: XX`) displayed in the HUD during gameplay; reaching zero triggers game-over.  The HUD is drawn in a window; sprite code hides the player when it falls beneath the HUD to avoid rendering artifacts (window layers are always on top).
+- **Wide pitfall level**: 48-tile (384 px) scrolling level with 3 pit zones, 4 raised platforms, column streaming into the 32-tile hardware ring buffer, and a **finish flag** at the far right that triggers the win state.
+- **Asset tooling**: Python generators in `tools/` to produce indexed PNGs and `.c/.h` asset files; optional `png2asset` conversion via Makefile.  Background definitions can now specify `floor:platform` tiles that behave as one-way/air platforms above gaps.
 - **Modular includes**: Makefile adds `-Isrc/lib/include` and `-Ires` so code can `#include "sprite.h"` and `#include "background.h"` without path noise.
 
 ## Prerequisites

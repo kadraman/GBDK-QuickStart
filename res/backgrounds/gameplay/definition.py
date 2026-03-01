@@ -26,6 +26,7 @@ Tile index list (16 tiles)
  13  Dirt
  14  Deep ground
  15  Platform block (stone, player can land on top)
+ 16  Finish flag (visual indicator at level end)
 
 Palette layout
 --------------
@@ -65,6 +66,7 @@ PNG_PALETTE = [
     (255, 255, 255),  # 1 white / cloud
     ( 60, 150,  60),  # 2 green
     ( 40,  80,  20),  # 3 dark
+    # (tile 16 finish flag uses existing palette colours)
 ]
 
 S = 0  # sky
@@ -73,7 +75,7 @@ G = 2  # green (foliage / grass)
 D = 3  # dark  (tree outline / dirt)
 
 # ---------------------------------------------------------------------------
-# 8x8 tile definitions (16 tiles)
+# 8x8 tile definitions (17 tiles, including finish flag)
 # ---------------------------------------------------------------------------
 TILES = [
     # 0: Sky solid
@@ -223,8 +225,18 @@ TILES = [
      [D,G,G,G,D,G,G,D],
      [D,G,G,G,D,G,G,D],
      [D,D,D,D,D,D,D,D]],
+
+    # 16: Finish flag (uses same palette as ground tiles)
+    [[S,D,D,D,D,D,S,S],   # D→3 = dirt dark (flag outline)
+     [S,D,D,W,W,W,W,D],   # W→1 = white (flag face)
+     [S,D,D,W,W,W,W,D],
+     [S,D,D,D,D,D,S,S],
+     [S,D,D,D,S,S,S,S],
+     [S,D,D,D,S,S,S,S],
+     [S,D,D,D,S,S,S,S],
+     [D,D,D,D,D,D,D,D]],
 ]
-assert len(TILES) == 16, f"Expected 16 tiles, got {len(TILES)}"
+assert len(TILES) == 17, f"Expected 17 tiles, got {len(TILES)}"
 
 # ---------------------------------------------------------------------------
 # 48x18 tilemap
@@ -232,14 +244,20 @@ assert len(TILES) == 16, f"Expected 16 tiles, got {len(TILES)}"
 _SKY    = 0
 _CTL,_CTC,_CTR = 1,2,3   # cloud top
 _CBL,_CBC,_CBR = 4,5,6   # cloud bottom
-_FTL,_FTR = 7,8           # foliage top
-_FBL,_FBR = 9,10          # foliage bottom
-_TRK    = 11               # trunk
+_FTL,_FTR = 7,8          # foliage top
+_FBL,_FBR = 9,10         # foliage bottom
+_TRK    = 11             # trunk
 _GRASS  = 12
 _DIRT   = 13
 _DEEP   = 14
-_PLAT   = 15               # platform block
+_PLAT   = 15            # platform block
+_FLAG   = 16            # finish flag (uses same palette as ground tiles)
 
+# world-X where player wins; must match C CHECKPOINT_X16 = 368
+# (flag tile lies one column to the right of the original checkpoint)
+CHECKPOINT_X16 = 368
+# map column corresponding to end of level (flag location)
+CHECKPOINT_COL = (CHECKPOINT_X16 // 8)
 MAP_W, MAP_H = 48, 18
 
 # Trees: (left_col, right_col)
@@ -253,7 +271,10 @@ _PITS = [(10,12), (21,24), (34,38)]
 
 # Platform blocks: cols where row 9 has a platform tile
 # Placed on solid ground sections, before or between pits
-_PLAT_COLS = {7, 15, 16, 27, 28, 42}
+_PLAT_COLS = {7, 27, 28, 42}
+
+# Air platforms – floating blocks above the trees (row 6)
+_AIR_PLAT_COLS = {12, 25, 36}
 
 def _is_pit(col):
     for (ps, pe) in _PITS:
@@ -270,11 +291,17 @@ def _build_tilemap():
 
             pit = _is_pit(col)
 
-            if not pit:
+            # air platforms should show regardless of pits
+            if row == 6 and col in _AIR_PLAT_COLS:
+                tile = _PLAT
+            elif not pit:
                 if row >= 14:
                     tile = _DEEP
                 elif row >= 11:
                     tile = _DIRT
+                elif row == 9 and col == CHECKPOINT_COL:
+                    # place finish-flag on the tile above the grass row
+                    tile = _FLAG
                 elif row == 10:
                     tile = _GRASS
                 elif row == 9 and col in _PLAT_COLS:

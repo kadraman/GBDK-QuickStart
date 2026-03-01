@@ -2,11 +2,15 @@
 #include <gb/cgb.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <gbdk/emu_debug.h>
 #include "sprite.h"
 #include "sprite_manager.h"
 #include "sprite_player.h"
 #include "player.h"
 #include "bg_gameplay.h"
+
+/* vertical location of the HUD window (matches state_gameplay.c) */
+#define HUD_WIN_Y 112U
 
 /* -----------------------------------------------------------------------
  * Player physics constants
@@ -42,17 +46,35 @@ static uint8_t      _gravity_delay_ctr;
  * -------------------------------------------------------------------- */
 static uint8_t _has_ground_below(uint8_t world_y, uint16_t world_x16)
 {
-    uint8_t feet_y;
-    uint8_t tile_row;
-    uint8_t tile;
-    uint8_t i;
+    /* Previous implementation looked only at the tile column under the
+     * sprite's left edge.  For a 16‑pixel wide sprite that meant the
+     * right half could hang over a gap while the check returned false
+     * prematurely, causing the player to flip between walk/idle when
+     * straddling the edge.  Here we sample every column spanned by the
+     * sprite's hitbox (or full width if no hitbox) and return true if any
+     * of them sit on a collideable tile. */
 
-    feet_y   = (uint8_t)(world_y + _player_sprite->height);
-    tile_row = (uint8_t)(feet_y >> 3);
-    tile     = sprite_manager_tile_at(
-        world_x16, tile_row, bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH);
-    for (i = 0U; i < BG_GAMEPLAY_COLLISION_TILE_COUNT; i++) {
-        if (bg_gameplay_collision_tiles[i] == tile) return 1U;
+    uint8_t feet_y   = (uint8_t)(world_y + _player_sprite->height);
+    uint8_t tile_row = (uint8_t)(feet_y >> 3);
+    uint8_t aw = _player_sprite->hitbox_w ? _player_sprite->hitbox_w
+                                          : _player_sprite->width;
+    uint16_t col_start = (uint16_t)(world_x16 >> 3);
+    uint16_t col_end   = (uint16_t)((world_x16 + aw - 1U) >> 3);
+    uint16_t col;
+    uint8_t tile, i;
+
+    if (col_start >= (uint16_t)BG_GAMEPLAY_MAP_WIDTH) return 0U;
+    if (col_end >= (uint16_t)BG_GAMEPLAY_MAP_WIDTH)
+        col_end = (uint16_t)(BG_GAMEPLAY_MAP_WIDTH - 1U);
+
+    for (col = col_start; col <= col_end; col++) {
+        tile = sprite_manager_tile_at((uint16_t)(col * 8U), tile_row,
+                                      bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH);
+        for (i = 0U; i < BG_GAMEPLAY_COLLISION_TILE_COUNT; i++) {
+            if (bg_gameplay_collision_tiles[i] == tile) {
+                return 1U;
+            }
+        }
     }
     return 0U;
 }
@@ -65,8 +87,15 @@ void player_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base)
     _gravity_delay_ctr = 0U;
     _player_world_x16  = (uint16_t)start_x;
 
+    /* Player is a 16x16 graphic made from two 8x16 OBJ slots.  The
+     * sprite manager needs the full visual width so hitbox/collision
+     * tests cover both halves.  Previously the width was incorrectly
+     * passed as 8 which meant only the left half of the player was
+     * considered when checking world-tile collisions.  As a result the
+     * character could slide halfway into a wall before the collision
+     * routine triggered.  Using 16 here fixes horizontal wall detection. */
     _player_sprite = sprite_manager_alloc(
-        0U, 2U, 8U, 16U, tile_base, PLAYER_TILES_PER_FRAME);
+        0U, 2U, 16U, 16U, tile_base, PLAYER_TILES_PER_FRAME);
     _player_sprite->world_x    = start_x;
     _player_sprite->world_y    = ground_y;
     _player_sprite->anim_speed = PLAYER_ANIM_IDLE_SPEED;
@@ -84,7 +113,7 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
     uint8_t     events  = 0U;
     uint8_t     moved   = 0U;
     int16_t     new_y;
-    uint8_t     screen_x, hw_x;
+    uint8_t     screen_x, hw_x, hw_y;
     uint8_t     tile_idx, prop;
     uint8_t     anim_start, anim_frames;
     uint8_t     snap_row;
@@ -94,31 +123,45 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
     if (joy & J_RIGHT) {
         _player_facing_r = 1U;
         if (_player_world_x16 < (uint16_t)MAX_WORLD_X) {
-            _player_world_x16++;
+            uint16_t try_x16 = (uint16_t)(_player_world_x16 + 1U);
             _player_sprite->world_x =
-                (uint8_t)(_player_world_x16 - (uint16_t)(*camera_x));
-            /* Check for wall: solid tiles block left/right/above/below */
+                (uint8_t)(try_x16 - (uint16_t)(*camera_x));
+            EMU_printf("Checking right movement collision at world_x16=%u\n", try_x16);
+            /* check both solid and platform collision tiles */
             if (sprite_manager_tile_collision(
-                    _player_sprite, _player_world_x16,
+                    _player_sprite, try_x16,
                     bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
-                    bg_gameplay_solid_tiles, BG_GAMEPLAY_SOLID_TILE_COUNT)) {
-                _player_world_x16--;   /* revert */
+                    bg_gameplay_solid_tiles, BG_GAMEPLAY_SOLID_TILE_COUNT) ||
+                sprite_manager_tile_collision(
+                    _player_sprite, try_x16,
+                    bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
+                    bg_gameplay_collision_tiles, BG_GAMEPLAY_COLLISION_TILE_COUNT)) {
+                EMU_printf("Collision detected, movement blocked\n");
             } else {
+                _player_world_x16 = try_x16;
+                EMU_printf("No collision, movement successful\n");
                 moved = 1U;
             }
         }
     } else if (joy & J_LEFT) {
         _player_facing_r = 0U;
         if (_player_world_x16 > min_world_x) {
-            _player_world_x16--;
+            uint16_t try_x16 = (uint16_t)(_player_world_x16 - 1U);
             _player_sprite->world_x =
-                (uint8_t)(_player_world_x16 - (uint16_t)(*camera_x));
+                (uint8_t)(try_x16 - (uint16_t)(*camera_x));
+            EMU_printf("Checking left movement collision at world_x16=%u\n", try_x16);
             if (sprite_manager_tile_collision(
-                    _player_sprite, _player_world_x16,
+                    _player_sprite, try_x16,
                     bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
-                    bg_gameplay_solid_tiles, BG_GAMEPLAY_SOLID_TILE_COUNT)) {
-                _player_world_x16++;   /* revert */
+                    bg_gameplay_solid_tiles, BG_GAMEPLAY_SOLID_TILE_COUNT) ||
+                sprite_manager_tile_collision(
+                    _player_sprite, try_x16,
+                    bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
+                    bg_gameplay_collision_tiles, BG_GAMEPLAY_COLLISION_TILE_COUNT)) {
+                EMU_printf("Collision detected, movement blocked\n");
             } else {
+                _player_world_x16 = try_x16;
+                EMU_printf("No collision, movement successful\n");
                 moved = 1U;
             }
         }
@@ -250,7 +293,11 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
     } else {
         prop = (uint8_t)(prop | S_FLIPX);
     }
+    /* window is drawn above sprites; we can't place a sprite behind it,
+       so we will hide the hardware objects when the player drops into the
+       HUD region (see movement below). */
     set_sprite_prop(0U, prop);
+
     prop = get_sprite_prop(1U);
     if (_player_facing_r) {
         prop = (uint8_t)(prop & ~S_FLIPX);
@@ -261,8 +308,16 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
 
     /* --- Move player OBJ slots --- */
     hw_x = (uint8_t)(_player_world_x16 - (uint16_t)(*camera_x) + 8U);
-    move_sprite(0U, hw_x, (uint8_t)(_player_sprite->world_y + 16U));
-    move_sprite(1U, (uint8_t)(hw_x + 8U), (uint8_t)(_player_sprite->world_y + 16U));
+    hw_y = (uint8_t)(_player_sprite->world_y + 16U);
+    /* hide sprites if they would overlap the HUD window; they will be
+       respawned when the level restarts or player is reset. */
+    if (hw_y >= HUD_WIN_Y) {
+        move_sprite(0U, 0U, 0U);
+        move_sprite(1U, 0U, 0U);
+    } else {
+        move_sprite(0U, hw_x, hw_y);
+        move_sprite(1U, (uint8_t)(hw_x + 8U), hw_y);
+    }
 
     return events;
 }

@@ -37,8 +37,14 @@ static uint8_t _enemy_has_ground_at(uint16_t world_x16)
     tile_row = (uint8_t)(feet_y >> 3);
     tile     = sprite_manager_tile_at(
         world_x16, tile_row, bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH);
+    /* treat both solid tiles and one-way collision tiles as ground; this matches
+     * how the player uses bg_gameplay_collision_tiles for landing and prevents
+     * enemies from walking off platforms. */
     for (i = 0U; i < BG_GAMEPLAY_SOLID_TILE_COUNT; i++) {
         if (bg_gameplay_solid_tiles[i] == tile) return 1U;
+    }
+    for (i = 0U; i < BG_GAMEPLAY_COLLISION_TILE_COUNT; i++) {
+        if (bg_gameplay_collision_tiles[i] == tile) return 1U;
     }
     return 0U;
 }
@@ -74,14 +80,20 @@ void enemy_update(uint8_t camera_x)
     /* --- Patrol movement with pit-edge and wall detection --- */
     next_x16 = (uint16_t)((int16_t)_enemy_world_x16 + _enemy_dx);
 
-    /* Check for solid tile wall ahead and solid ground below next step */
+    /* Check for solid wall or platform side ahead and ground below next
+     * step.  platforms use the same collision list as player landing, so we
+     * test them separately rather than adding them to the solid list. */
     _enemy_sprite->world_x = (uint8_t)next_x16;  /* temp for tile_collision */
     if (sprite_manager_tile_collision(
             _enemy_sprite, next_x16,
             bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
             bg_gameplay_solid_tiles, BG_GAMEPLAY_SOLID_TILE_COUNT) ||
+        sprite_manager_tile_collision(
+            _enemy_sprite, next_x16,
+            bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
+            bg_gameplay_collision_tiles, BG_GAMEPLAY_COLLISION_TILE_COUNT) ||
         !_enemy_has_ground_at(next_x16)) {
-        /* Hit a wall or about to walk off a pit edge – reverse direction */
+        /* Hit a wall/platform side or about to walk off a pit edge – reverse */
         _enemy_dx = -_enemy_dx;
         next_x16  = _enemy_world_x16;   /* stay in place this frame */
     }
