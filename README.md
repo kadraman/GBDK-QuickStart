@@ -16,8 +16,8 @@ It Includes a state-machine game loop, pre-generated 2bpp tile assets, GBC color
 - **Multiple fonts**: Font definitions in `res/fonts/<name>/definition.py`, same auto-discovery as backgrounds and sprites.
 - **Timer HUD**: A 60-second countdown (`TIME: XX`) displayed in the HUD during gameplay; reaching zero triggers game-over.  The HUD is drawn in a window; sprite code hides the player when it falls beneath the HUD to avoid rendering artifacts (window layers are always on top).
 - **Wide pitfall level**: 48-tile (384 px) scrolling level with 3 pit zones, 4 raised platforms, column streaming into the 32-tile hardware ring buffer, and a **finish flag** at the far right that triggers the win state.
-- **Asset tooling**: Python generators in `tools/` to produce indexed PNGs and `.c/.h` asset files; optional `png2asset` conversion via Makefile.  Background definitions can now specify `floor:platform` tiles that behave as one-way/air platforms above gaps.
-- **Modular includes**: Makefile adds `-Isrc/lib/include` and `-Ires` so code can `#include "sprite.h"` and `#include "background.h"` without path noise.
+- **Asset tooling**: Python generators in `tools/` to produce indexed PNGs and `.c/.h` asset files; optional `png2asset` conversion via Makefile.  Each background `definition.py` exports two tile-ID lists: `COLLISION_TILE_IDS` (multi-directional — block all sides, used for walls and solid ground) and `COLLISION_TILE_DOWN_IDS` (landing-surface only — sprites can pass through from below or the sides, used for one-way air platforms).  The per-tile `ATTR_MAP` controls which GBC background palette is applied to each tile position.
+- **Modular includes**: Makefile adds `-Isrc/lib/include` and `-Ires` so code can `#include "sprite.h"` and `#include "bg_gameplay.h"` without path noise.
 
 ## Prerequisites
 
@@ -44,11 +44,13 @@ GBDK-QuickStart/
 │   │   ├── include/          # Public API headers (add -Isrc/lib/include)
 │   │   │   ├── sprite.h
 │   │   │   ├── sprite_manager.h
-│   │   │   └── states.h
+│   │   │   ├── states.h
+│   │   │   └── utils.h
 │   │   └── src/              # Library implementations
 │   │       ├── sprite.c
 │   │       ├── sprite_manager.c
-│   │       └── state_machine.c
+│   │       ├── state_machine.c
+│   │       └── utils.c
 │   └── game/                 # Application / game-specific code
 │       ├── main.c            # Entry: VRAM setup, palettes, main loop
 │       ├── states/           # State implementations (game logic)
@@ -61,16 +63,16 @@ GBDK-QuickStart/
 │           └── sprite_enemy.c
 ├── res/                     # Generated assets (PNG + .c/.h from generators)
 │   ├── backgrounds/          # Background definitions (one sub-dir per state)
-│   │   ├── gameplay/definition.py  → background.c/.h (48-tile wide level)
-│   │   ├── title/definition.py     → bg_title.c/.h   (night sky)
+│   │   ├── gameplay/definition.py  → bg_gameplay.c/.h (48-tile wide level)
+│   │   ├── title/definition.py     → bg_title.c/.h    (night sky)
 │   │   ├── gameover/definition.py  → bg_gameover.c/.h (crimson sky)
-│   │   └── win/definition.py       → bg_win.c/.h     (golden sky)
+│   │   └── win/definition.py       → bg_win.c/.h      (golden sky)
 │   ├── fonts/
 │   │   └── default/definition.py  → font.c/.h
 │   ├── sprites/
 │   │   ├── player/definition.py   → player.c/.h (16x16 animated)
 │   │   └── enemy/definition.py    → enemy.c/.h  (8x8 patrol enemy)
-│   ├── background.png / background.c/.h
+│   ├── bg_gameplay.png / bg_gameplay.c/.h
 │   ├── bg_title.png / bg_title.c/.h
 │   ├── bg_gameover.png / bg_gameover.c/.h
 │   ├── bg_win.png / bg_win.c/.h
@@ -87,7 +89,7 @@ Notes:
 - Public library headers live in `src/lib/include`. The `Makefile` already
    sets compiler `-I` include paths for `src/lib/include`, `src/game`,
    `src/game/states`, `src/game/sprites` and `res/` so sources may simply
-   `#include "sprite.h"` or `#include "background.h"` as seen in the code.
+   `#include "sprite.h"` or `#include "bg_gameplay.h"` as seen in the code.
 - Reusable logic (sprite manager, collision, state machine, utils) is in
    `src/lib/*` and can be extracted to separate projects or published as a
    small library in future.
@@ -201,7 +203,9 @@ byte intentionally when you need to select alternate pattern banks.
 The game uses a simple three-state machine:
 
 ```
-[ Title Screen ] --START--> [ Gameplay ] --START--> [ Game Over ] --START--> [ Title Screen ]
+[ Title Screen ] ──START──▶ [ Gameplay ] ──reach flag──▶ [ Win       ] ──START──▶ [ Title Screen ]
+                                  │                                                       ▲
+                                  └── lives=0 or timer=0 ──▶ [ Game Over ] ──START──────┘
 ```
 
 Each state implements three callbacks:
@@ -259,9 +263,16 @@ generating all PNG and C/H source files from scratch.  No GBDK installation is n
 
 ### Add a new background tileset
 
-1. Create a 160×144 indexed PNG with ≤4 colors per palette
-2. Add it to `res/` and run `make convert` or the Python generator
-3. Call `set_bkg_data()` and `set_bkg_palette()` in `main.c`
+The recommended workflow is to author a `definition.py` (no external tools needed):
+
+1. Create `res/backgrounds/<name>/definition.py` defining `TILES`, `TILEMAP_FLAT`, `PALETTE_COLORS`, `ATTR_MAP`, `MAP_W`, `MAP_H`, and optionally `COLLISION_TILE_IDS` / `COLLISION_TILE_DOWN_IDS`.
+2. Run `make generate` — this produces `res/<name>.png`, `res/<name>.c`, and `res/<name>.h`.
+3. In your state's `init()`, call `set_bkg_data()` and `set_bkg_palette()` using the generated constants, and write the attr map via `VBK_REG = 1`.
+
+Alternatively, if you have GBDK-2020 and prefer `png2asset`:
+
+1. Create a 160×144 indexed PNG with ≤4 colours per palette and add it to `res/`.
+2. Run `make convert` to generate the `.c/.h` pair.
 
 ### Add more sprites
 

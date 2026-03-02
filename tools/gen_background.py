@@ -18,7 +18,6 @@ Adding a new background
      TILES         – list of 8x8 pixel tile grids (list of 8 lists of 8 ints)
      TILEMAP_FLAT  – flat list of tile indices (MAP_W * MAP_H)
      PALETTE_COLORS– (r,g,b) tuples, length == n_palettes * 4
-     PNG_PALETTE   – (r,g,b) tuples for the PNG preview
      MAP_W, MAP_H  – tilemap dimensions in tiles
      ATTR_MAP      – flat list of per-tile palette attribute bytes
 3. Run  make generate  (or  python3 tools/gen_background.py)
@@ -59,27 +58,32 @@ def process_definition(defn_path):
     tiles              = mod.TILES
     tilemap_flat       = mod.TILEMAP_FLAT
     palette_colors     = mod.PALETTE_COLORS
-    png_palette        = mod.PNG_PALETTE
     map_w              = mod.MAP_W
     map_h              = mod.MAP_H
     attr_map           = mod.ATTR_MAP
-    collision_tile_ids = getattr(mod, 'COLLISION_TILE_IDS', None)
-    solid_tile_ids     = getattr(mod, 'SOLID_TILE_IDS',     None)
+    collision_down_tile_ids = getattr(mod, 'COLLISION_TILE_DOWN_IDS', None)
+    collision_tile_ids      = getattr(mod, 'COLLISION_TILE_IDS',      None)
 
     out_dir = os.path.join(REPO_ROOT, 'res')
     os.makedirs(out_dir, exist_ok=True)
 
-    # Build preview PNG from tilemap + tiles
+    # Build preview PNG from tilemap + tiles, honouring per-tile palette via attr_map.
+    # The PNG palette is laid out as: indices 0-3 = palette 0, indices 4-7 = palette 1.
+    # Pixel values for palette-1 tiles are offset by 4 so they look up the right colours.
+    # PALETTE_COLORS must contain at least 8 entries (2 palettes × 4 colours).
+    n_palette0 = 4
+    combined_png_palette = list(palette_colors[:8])  # [pal0_col0..3, pal1_col0..3]
     pixel_grid = [[0] * (map_w * 8) for _ in range(map_h * 8)]
     for idx, tile_id in enumerate(tilemap_flat):
         row, col = divmod(idx, map_w)
         tile = tiles[tile_id]
+        palette_offset = n_palette0 if (attr_map and attr_map[idx] & 0x07) else 0
         for ty in range(8):
             for tx in range(8):
-                pixel_grid[row * 8 + ty][col * 8 + tx] = tile[ty][tx]
+                pixel_grid[row * 8 + ty][col * 8 + tx] = tile[ty][tx] + palette_offset
 
     png_path = os.path.join(out_dir, f'{name}.png')
-    make_indexed_png(pixel_grid, png_palette, png_path)
+    make_indexed_png(pixel_grid, combined_png_palette, png_path)
     print(f'Written {png_path}  ({map_w * 8}x{map_h * 8})')
 
     write_background_files(
@@ -91,8 +95,8 @@ def process_definition(defn_path):
         map_height=map_h,
         out_dir=out_dir,
         attr_map=attr_map,
+        collision_down_tile_ids=collision_down_tile_ids,
         collision_tile_ids=collision_tile_ids,
-        solid_tile_ids=solid_tile_ids,
         generator='gen_background.py',
     )
 

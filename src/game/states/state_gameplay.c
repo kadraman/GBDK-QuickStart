@@ -239,11 +239,30 @@ static void gameplay_init(void)
 
 static void gameplay_update(void)
 {
-    uint8_t  joy        = joypad();
-    uint8_t  joy_press  = (uint8_t)(joy & ~prev_joy);
+    uint8_t  joy;
+    uint8_t  joy_press;
     uint8_t  events;
     uint16_t min_world_x;
     uint8_t  cam_tile, needed_col;
+
+    /* --- Hardware register + VRAM updates (VBlank window) ---
+     * main() calls vsync() immediately before run_current_state(), so
+     * this function is entered right at the start of VBlank.  Commit the
+     * scroll register and stream any pending BG column now while VRAM
+     * and registers are safely accessible.  No wait_vbl_done() needed
+     * here because we are already inside VBlank.                        */
+    SCX_REG = camera_x;
+
+    cam_tile   = (uint8_t)(camera_x >> 3);
+    needed_col = (uint8_t)(cam_tile + 21U);
+    if (needed_col < BG_GAMEPLAY_MAP_WIDTH && needed_col >= bg_stream_right) {
+        load_bg_column(bg_stream_right);
+        bg_stream_right++;
+    }
+
+    /* --- Game logic (runs during active display) --- */
+    joy       = joypad();
+    joy_press = (uint8_t)(joy & ~prev_joy);
 
     /* --- Countdown timer --- */
     if (time_remaining > 0U) {
@@ -315,24 +334,6 @@ static void gameplay_update(void)
             return;
         }
         collision_cooldown = COLLISION_COOLDOWN;
-    }
-
-    /* --- Column streaming (rightward only) ---
-     * Pre-load columns just off the right edge of the screen.  This
-     * can take a bunch of VRAM writes, so we stay in VBLANK long enough
-     * to finish the work.  If the loop spills past the end of the blank
-     * period the LCD will start drawing as we update the tilemap and
-     * you'll see horizontal noise lines when the camera scrolls.  Doing a
-     * second wait_vbl_done() here ensures the blank doesn’t end until the
-     * column has been pushed into VRAM.
-     */
-    cam_tile   = (uint8_t)(camera_x >> 3);
-    needed_col = (uint8_t)(cam_tile + 21U);
-    if (needed_col < BG_GAMEPLAY_MAP_WIDTH && needed_col >= bg_stream_right) {
-        load_bg_column(bg_stream_right);
-        bg_stream_right++;
-        /* make sure additional work doesn’t bleed into active display */
-        wait_vbl_done();
     }
 
     prev_joy = joy;

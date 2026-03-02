@@ -50,13 +50,6 @@ PALETTE_COLORS = [
     ( 12,   6,   2),  # 3 deep dark
 ]
 
-PNG_PALETTE = [
-    ( 40,   0,   0),  # 0 dark sky
-    (160,   0,   0),  # 1 medium red
-    (220,  60,   0),  # 2 bright red
-    ( 15,   0,   0),  # 3 near black
-]
-
 K = 0  # dark sky
 R = 1  # red
 B = 2  # bright red / orange-red

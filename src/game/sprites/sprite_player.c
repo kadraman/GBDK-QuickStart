@@ -2,7 +2,9 @@
 #include <gb/cgb.h>
 #include <stddef.h>
 #include <stdint.h>
+#ifdef DEBUG
 #include <gbdk/emu_debug.h>
+#endif
 #include "sprite.h"
 #include "sprite_manager.h"
 #include "sprite_player.h"
@@ -46,20 +48,29 @@ static uint8_t      _gravity_delay_ctr;
  * -------------------------------------------------------------------- */
 static uint8_t _has_ground_below(uint8_t world_y, uint16_t world_x16)
 {
-    /* Previous implementation looked only at the tile column under the
-     * sprite's left edge.  For a 16‑pixel wide sprite that meant the
-     * right half could hang over a gap while the check returned false
-     * prematurely, causing the player to flip between walk/idle when
-     * straddling the edge.  Here we sample every column spanned by the
-     * sprite's hitbox (or full width if no hitbox) and return true if any
-     * of them sit on a collideable tile. */
+    /* Sample every tile column spanned by the sprite's hitbox (falling back
+     * to full sprite bounds when hitbox_w/h are 0) and return true if any
+     * column has a collideable tile directly beneath the feet.
+     *
+     * Feet Y  = world_y + hitbox_y + effective_hitbox_h
+     * X range = world_x16 + hitbox_x  ..  world_x16 + hitbox_x + aw - 1
+     *
+     * Using hitbox_x ensures we check the correct columns even if the
+     * hitbox is inset from the sprite's visual edges, and using
+     * hitbox_y + hitbox_h (rather than sprite->height) ensures the feet
+     * row is derived from the bottom of the collision box, not the visual
+     * bottom of the sprite. */
 
-    uint8_t feet_y   = (uint8_t)(world_y + _player_sprite->height);
-    uint8_t tile_row = (uint8_t)(feet_y >> 3);
-    uint8_t aw = _player_sprite->hitbox_w ? _player_sprite->hitbox_w
-                                          : _player_sprite->width;
-    uint16_t col_start = (uint16_t)(world_x16 >> 3);
-    uint16_t col_end   = (uint16_t)((world_x16 + aw - 1U) >> 3);
+    uint8_t  hx      = _player_sprite->hitbox_x;
+    uint8_t  hy      = _player_sprite->hitbox_y;
+    uint8_t  aw      = _player_sprite->hitbox_w ? _player_sprite->hitbox_w
+                                                 : _player_sprite->width;
+    uint8_t  ah      = _player_sprite->hitbox_h ? _player_sprite->hitbox_h
+                                                 : _player_sprite->height;
+    uint8_t  feet_y   = (uint8_t)(world_y + hy + ah);
+    uint8_t  tile_row = (uint8_t)(feet_y >> 3);
+    uint16_t col_start = (uint16_t)((world_x16 + hx) >> 3);
+    uint16_t col_end   = (uint16_t)((world_x16 + hx + aw - 1U) >> 3);
     uint16_t col;
     uint8_t tile, i;
 
@@ -70,8 +81,8 @@ static uint8_t _has_ground_below(uint8_t world_y, uint16_t world_x16)
     for (col = col_start; col <= col_end; col++) {
         tile = sprite_manager_tile_at((uint16_t)(col * 8U), tile_row,
                                       bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH);
-        for (i = 0U; i < BG_GAMEPLAY_COLLISION_TILE_COUNT; i++) {
-            if (bg_gameplay_collision_tiles[i] == tile) {
+        for (i = 0U; i < BG_GAMEPLAY_COLLISION_DOWN_TILE_COUNT; i++) {
+            if (bg_gameplay_collision_down_tiles[i] == tile) {
                 return 1U;
             }
         }
@@ -126,20 +137,23 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
             uint16_t try_x16 = (uint16_t)(_player_world_x16 + 1U);
             _player_sprite->world_x =
                 (uint8_t)(try_x16 - (uint16_t)(*camera_x));
+#ifdef DEBUG
             EMU_printf("Checking right movement collision at world_x16=%u\n", try_x16);
-            /* check both solid and platform collision tiles */
+#endif
+            /* check collision tiles (multi-directional) only –
+             * collision_down_tiles are one-way and must not block lateral movement */
             if (sprite_manager_tile_collision(
                     _player_sprite, try_x16,
                     bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
-                    bg_gameplay_solid_tiles, BG_GAMEPLAY_SOLID_TILE_COUNT) ||
-                sprite_manager_tile_collision(
-                    _player_sprite, try_x16,
-                    bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
                     bg_gameplay_collision_tiles, BG_GAMEPLAY_COLLISION_TILE_COUNT)) {
+#ifdef DEBUG
                 EMU_printf("Collision detected, movement blocked\n");
+#endif
             } else {
                 _player_world_x16 = try_x16;
+#ifdef DEBUG
                 EMU_printf("No collision, movement successful\n");
+#endif
                 moved = 1U;
             }
         }
@@ -149,19 +163,23 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
             uint16_t try_x16 = (uint16_t)(_player_world_x16 - 1U);
             _player_sprite->world_x =
                 (uint8_t)(try_x16 - (uint16_t)(*camera_x));
+#ifdef DEBUG
             EMU_printf("Checking left movement collision at world_x16=%u\n", try_x16);
+#endif
+            /* check collision tiles (multi-directional) only –
+             * collision_down_tiles are one-way and must not block lateral movement */
             if (sprite_manager_tile_collision(
                     _player_sprite, try_x16,
                     bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
-                    bg_gameplay_solid_tiles, BG_GAMEPLAY_SOLID_TILE_COUNT) ||
-                sprite_manager_tile_collision(
-                    _player_sprite, try_x16,
-                    bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
                     bg_gameplay_collision_tiles, BG_GAMEPLAY_COLLISION_TILE_COUNT)) {
+#ifdef DEBUG
                 EMU_printf("Collision detected, movement blocked\n");
+#endif
             } else {
                 _player_world_x16 = try_x16;
+#ifdef DEBUG
                 EMU_printf("No collision, movement successful\n");
+#endif
                 moved = 1U;
             }
         }
@@ -196,12 +214,12 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
 
         _player_sprite->world_y = (uint8_t)new_y;
 
-        /* Landing from above: collideable tiles (includes one-way platforms) */
+        /* Landing from above: top-surface tiles (one-way platforms and ledges included) */
         if (_player_vy >= 0 &&
             sprite_manager_tile_collision(
                 _player_sprite, _player_world_x16,
                 bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
-                bg_gameplay_collision_tiles, BG_GAMEPLAY_COLLISION_TILE_COUNT)) {
+                bg_gameplay_collision_down_tiles, BG_GAMEPLAY_COLLISION_DOWN_TILE_COUNT)) {
             /* Snap player to the top of the tile the feet entered */
             snap_row = (uint8_t)(((uint8_t)new_y + _player_sprite->height) >> 3);
             new_y = (int16_t)(snap_row * 8U) - (int16_t)_player_sprite->height;
@@ -211,12 +229,12 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
             _player_state      = moved ? PSTATE_WALK : PSTATE_IDLE;
         }
 
-        /* Ceiling: solid tiles block upward movement */
+        /* Ceiling: multi-directional collision tiles block upward movement */
         if (_player_vy < 0 &&
             sprite_manager_tile_collision(
                 _player_sprite, _player_world_x16,
                 bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
-                bg_gameplay_solid_tiles, BG_GAMEPLAY_SOLID_TILE_COUNT)) {
+                bg_gameplay_collision_tiles, BG_GAMEPLAY_COLLISION_TILE_COUNT)) {
             /* Snap to the bottom of the tile hit from below */
             snap_row = (uint8_t)((uint8_t)new_y >> 3);
             _player_sprite->world_y = (uint8_t)((snap_row + 1U) * 8U);
@@ -249,14 +267,15 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
         }
     }
 
-    /* --- Camera / scroll --- */
+    /* --- Camera / scroll ---
+     * Update camera_x only; the caller (gameplay_update) writes SCX_REG
+     * during VBlank so the scroll register is never touched mid-frame.   */
     screen_x = (uint8_t)(_player_world_x16 - (uint16_t)(*camera_x));
     if (screen_x > SCROLL_R_LIMIT && *camera_x < MAX_SCROLL_X) {
         (*camera_x)++;
     } else if (screen_x < SCROLL_L_LIMIT && *camera_x > 0U) {
         (*camera_x)--;
     }
-    SCX_REG = *camera_x;
 
     /* Re-sync sprite world_x with updated camera */
     _player_sprite->world_x =

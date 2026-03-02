@@ -52,13 +52,6 @@ PALETTE_COLORS = [
     ( 50,  35,  10),  # 3 deep dirt
 ]
 
-PNG_PALETTE = [
-    (255, 200,  50),  # 0 golden sky
-    (255, 255, 200),  # 1 sun / sparkle
-    (240, 240, 240),  # 2 cloud white
-    (180, 180, 200),  # 3 cloud shadow
-]
-
 S = 0  # sky golden
 L = 1  # sparkle / sun bright
 C = 2  # cloud white
