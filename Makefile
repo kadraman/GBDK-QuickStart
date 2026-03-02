@@ -85,10 +85,18 @@ convert:
 $(OBJDIR):
 	mkdir -p $(OBJDIR) $(DIRS)
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+# All header files – any change to a header forces recompilation of every .o
+# that could include it, avoiding stale objects due to changed defines.
+HEADERS     = $(wildcard $(SRCDIR)/lib/include/*.h) \
+              $(wildcard $(SRCDIR)/game/*.h) \
+              $(wildcard $(SRCDIR)/game/states/*.h) \
+              $(wildcard $(SRCDIR)/game/sprites/*.h) \
+              $(wildcard $(RESDIR)/*.h)
+
+$(OBJDIR)/%.o: $(SRCDIR)/%.c $(HEADERS) | $(OBJDIR)
 	$(LCC) $(LCCFLAGS) $(INCLUDES) -c -o $@ $<
 
-$(OBJDIR)/%.o: $(RESDIR)/%.c | $(OBJDIR)
+$(OBJDIR)/%.o: $(RESDIR)/%.c $(HEADERS) | $(OBJDIR)
 	$(LCC) $(LCCFLAGS) -c -o $@ $<
 
 $(BINS): $(OBJS)
@@ -112,5 +120,5 @@ clean:
 
 clean-generated:
 	# Remove generated asset sources in res/ (backgrounds, fonts, sprites)
-	rm -f $(RESDIR)/background.* $(RESDIR)/bg_title.* $(RESDIR)/bg_gameover.* $(RESDIR)/bg_win.*
+	rm -f $(RESDIR)/bg_gameplay.* $(RESDIR)/bg_title.* $(RESDIR)/bg_gameover.* $(RESDIR)/bg_win.*
 	rm -f $(RESDIR)/font.* $(RESDIR)/player.* $(RESDIR)/enemy.*

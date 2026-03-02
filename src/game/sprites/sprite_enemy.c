@@ -7,6 +7,7 @@
 #include "sprite_enemy.h"
 #include "player.h"
 #include "enemy.h"
+#include "bg_gameplay.h"
 
 /* -----------------------------------------------------------------------
  * Enemy constants
@@ -15,14 +16,40 @@
 #define ENEMY_PATROL_LEFT    10U   /* left patrol boundary (world-X)      */
 #define ENEMY_PATROL_RIGHT  180U   /* right patrol boundary (world-X)     */
 
-static Sprite  *_enemy_sprite;
-static int8_t   _enemy_dx;        /* patrol direction (+1 or -1)         */
-static uint8_t  _enemy_is_idle;   /* 1 = currently using idle animation  */
+static Sprite   *_enemy_sprite;
+static uint16_t  _enemy_world_x16;   /* full 16-bit absolute world X      */
+static int8_t    _enemy_dx;          /* patrol direction (+1 or -1)       */
+static uint8_t   _enemy_is_idle;     /* 1 = currently using idle animation */
+
+/* -----------------------------------------------------------------------
+ * _enemy_has_ground_at
+ * Returns 1 if there is a solid tile (ground) at the given world-X and
+ * directly below the enemy's feet.  Used to detect pit edges.
+ * -------------------------------------------------------------------- */
+static uint8_t _enemy_has_ground_at(uint16_t world_x16)
+{
+    uint8_t feet_y;
+    uint8_t tile_row;
+    uint8_t tile;
+    uint8_t i;
+
+    feet_y   = (uint8_t)(_enemy_sprite->world_y + _enemy_sprite->height);
+    tile_row = (uint8_t)(feet_y >> 3);
+    tile     = sprite_manager_tile_at(
+        world_x16, tile_row, bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH);
+    /* treat any landing surface (collision_down tiles) as ground so enemies
+     * stop at platforms and ledges just as the player does. */
+    for (i = 0U; i < BG_GAMEPLAY_COLLISION_DOWN_TILE_COUNT; i++) {
+        if (bg_gameplay_collision_down_tiles[i] == tile) return 1U;
+    }
+    return 0U;
+}
 
 void enemy_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base)
 {
-    _enemy_dx     = 1;
+    _enemy_dx      = 1;
     _enemy_is_idle = 0U;
+    _enemy_world_x16 = (uint16_t)start_x;
 
     _enemy_sprite = sprite_manager_alloc(
         ENEMY_OBJ_ID, 1U, 8U, 8U, tile_base, ENEMY_TILES_PER_FRAME);
@@ -33,19 +60,45 @@ void enemy_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base)
     /* GBC sprite palette slot 1 for enemy */
     set_sprite_tile(ENEMY_OBJ_ID, (uint8_t)(tile_base + ENEMY_ANIM_WALK_START));
     set_sprite_prop(ENEMY_OBJ_ID, 0x01U);
-    sprite_manager_update_hw(_enemy_sprite, 0U, 0U);
+    move_sprite(ENEMY_OBJ_ID, (uint8_t)(start_x + 8U),
+                (uint8_t)(_enemy_sprite->world_y + 16U));
 }
 
 void enemy_update(uint8_t camera_x)
 {
-    uint8_t tile_idx;
-    uint8_t prop;
-    uint8_t anim_start, anim_frames;
+    uint16_t next_x16;
+    int16_t  screen_x;
+    uint8_t  hw_x, hw_y;
+    uint8_t  tile_idx;
+    uint8_t  prop;
+    uint8_t  anim_start, anim_frames;
 
-    /* --- Patrol movement --- */
-    _enemy_sprite->world_x = (uint8_t)((int16_t)_enemy_sprite->world_x + _enemy_dx);
-    if (_enemy_sprite->world_x >= ENEMY_PATROL_RIGHT) { _enemy_dx = -1; }
-    if (_enemy_sprite->world_x <= ENEMY_PATROL_LEFT)  { _enemy_dx =  1; }
+    /* --- Patrol movement with pit-edge and wall detection --- */
+    next_x16 = (uint16_t)((int16_t)_enemy_world_x16 + _enemy_dx);
+
+    /* Check for a solid wall ahead (collision tiles, all directions) or an
+     * edge drop.  One-way ledges (collision_down only) are passable from
+     * the side so the enemy walks through them horizontally.             */
+    _enemy_sprite->world_x = (uint8_t)next_x16;  /* temp for tile_collision */
+    if (sprite_manager_tile_collision(
+            _enemy_sprite, next_x16,
+            bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
+            bg_gameplay_collision_tiles, BG_GAMEPLAY_COLLISION_TILE_COUNT) ||
+        !_enemy_has_ground_at(next_x16)) {
+        /* Hit a wall/platform side or about to walk off a pit edge – reverse */
+        _enemy_dx = -_enemy_dx;
+        next_x16  = _enemy_world_x16;   /* stay in place this frame */
+    }
+
+    _enemy_world_x16 = next_x16;
+
+    /* Enforce patrol boundaries */
+    if (_enemy_world_x16 >= (uint16_t)ENEMY_PATROL_RIGHT) {
+        _enemy_dx = -1;
+    }
+    if (_enemy_world_x16 <= (uint16_t)ENEMY_PATROL_LEFT) {
+        _enemy_dx = 1;
+    }
 
     /* --- Animation: walk while moving --- */
     anim_start  = ENEMY_ANIM_WALK_START;
@@ -74,8 +127,30 @@ void enemy_update(uint8_t camera_x)
     }
     set_sprite_prop(ENEMY_OBJ_ID, prop);
 
-    /* --- Move OBJ hardware slot --- */
-    sprite_manager_update_hw(_enemy_sprite, camera_x, 0U);
+    /* --- Compute screen-relative X using signed arithmetic ---
+     * world_x is kept screen-relative so sprites_collide() correctly
+     * compares player (screen-relative) vs enemy (screen-relative).
+     * When the enemy is off-screen we set active = 0 so sprites_collide()
+     * skips the AABB test entirely (it checks active before comparing
+     * coordinates).  This also avoids the wrap-around false-collision
+     * that would occur if a negative screen_x were truncated to uint8_t
+     * (e.g. -1 → 255) and happened to overlap the player's position.
+     * world_x is only written with the clamped uint8_t value when the
+     * enemy is actually visible, keeping it in the valid 0..255 range.  */
+    screen_x = (int16_t)_enemy_world_x16 - (int16_t)camera_x;
+
+    if (screen_x < -8 || screen_x > 168) {
+        /* Off-screen: deactivate collision and hide the hardware sprite */
+        _enemy_sprite->active = 0U;
+        move_sprite(ENEMY_OBJ_ID, 0U, 0U);
+    } else {
+        /* On-screen: restore collision, update world_x (safe to cast), draw */
+        _enemy_sprite->active  = 1U;
+        _enemy_sprite->world_x = (uint8_t)screen_x;
+        hw_x = (uint8_t)(screen_x + 8);
+        hw_y = (uint8_t)(_enemy_sprite->world_y + 16U);
+        move_sprite(ENEMY_OBJ_ID, hw_x, hw_y);
+    }
 }
 
 void enemy_cleanup(void)

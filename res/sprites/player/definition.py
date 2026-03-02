@@ -166,6 +166,27 @@ _DIE2 = [
 ]
 
 # ---------------------------------------------------------------------------
+# Full-frame definitions – merge top and bottom halves into 16-row lists
+# This makes the animation table easier to read and eliminates the need
+# to concatenate halves in multiple places.  The original _TOP_* and
+# _BOT_* lists are still available in case you want to tweak a single-half
+# independently.
+# ---------------------------------------------------------------------------
+_FRAME_IDLE0   = _TOP_NORMAL + _BOT_IDLE
+_FRAME_IDLE1   = _TOP_NORMAL + _BOT_IDLE
+_FRAME_WALK0   = _TOP_NORMAL + _BOT_IDLE
+_FRAME_WALK1   = _TOP_NORMAL + _BOT_WALK1
+_FRAME_WALK2   = _TOP_NORMAL + _BOT_IDLE
+_FRAME_WALK3   = _TOP_NORMAL + _BOT_WALK3
+_FRAME_JUMP_UP = _TOP_JUMP   + _BOT_JUMP_UP
+_FRAME_JUMP_DN = _TOP_JUMP   + _BOT_JUMP_DN
+_FRAME_HIT0    = _TOP_HIT    + _BOT_DIE0
+_FRAME_HIT1    = _TOP_HIT    + _BOT_DIE1
+
+# convenience alias: the first idle frame represents the "normal" sprite
+_NORMAL = _FRAME_IDLE0
+
+# ---------------------------------------------------------------------------
 # Animation speeds (vblanks per frame)
 # ---------------------------------------------------------------------------
 ANIM_SPEEDS = {
@@ -180,22 +201,22 @@ ANIM_SPEEDS = {
 # ---------------------------------------------------------------------------
 ANIMATIONS = {
     'idle': [
-        _TOP_NORMAL + _BOT_IDLE,   # frame 0
-        _TOP_NORMAL + _BOT_IDLE,   # frame 1 (same – extend for blink if desired)
+        _FRAME_IDLE0,              # frame 0
+        _FRAME_IDLE1,              # frame 1 (same – extend for blink if desired)
     ],
     'walk': [
-        _TOP_NORMAL + _BOT_IDLE,   # frame 0: neutral
-        _TOP_NORMAL + _BOT_WALK1,  # frame 1: right leg forward
-        _TOP_NORMAL + _BOT_IDLE,   # frame 2: neutral
-        _TOP_NORMAL + _BOT_WALK3,  # frame 3: left leg forward
+        _FRAME_WALK0,              # frame 0: neutral
+        _FRAME_WALK1,              # frame 1: right leg forward
+        _FRAME_WALK2,              # frame 2: neutral
+        _FRAME_WALK3,              # frame 3: left leg forward
     ],
     'jump': [
-        _TOP_JUMP + _BOT_JUMP_UP,  # frame 0: ascending
-        _TOP_JUMP + _BOT_JUMP_DN,  # frame 1: descending
+        _FRAME_JUMP_UP,            # frame 0: ascending
+        _FRAME_JUMP_DN,            # frame 1: descending
     ],
     'die': [
-        _TOP_HIT  + _BOT_DIE0,     # frame 0: hit
-        _TOP_HIT  + _BOT_DIE1,     # frame 1: falling
-        _DIE2,                      # frame 2: flat on ground
+        _FRAME_HIT0,               # frame 0: hit
+        _FRAME_HIT1,               # frame 1: falling
+        _DIE2,                     # frame 2: flat on ground
     ],
 }

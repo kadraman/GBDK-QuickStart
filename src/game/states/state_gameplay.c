@@ -18,8 +18,9 @@
 /* Font starts immediately after background tiles in VRAM */
 #define FONT_FIRST_TILE  BG_GAMEPLAY_TILE_COUNT
 
-/* Win condition: reached the end of the 48-tile level */
-#define CHECKPOINT_X16   360U   /* world-X >= 360 triggers win           */
+/* Win condition: reached the finish flag.  flag is one tile beyond
+ * the previous checkpoint so we must bump the world‑X accordingly.       */
+#define CHECKPOINT_X16   368U   /* world-X >= 368 triggers win           */
 
 /* HUD window */
 #define HUD_WIN_Y        112U   /* window Y: bottom 4 tile rows (32 px)  */
@@ -221,7 +222,7 @@ static void gameplay_init(void)
     player_init(20U, 64U, 0U);
 
     /* Enemy: 8x8 -> 1 OBJ slot; tile_base after player tiles */
-    enemy_init(80U, 72U, PLAYER_TILE_COUNT);
+    enemy_init(160U, 72U, PLAYER_TILE_COUNT);
 
     /* Load initial 32 columns into hardware background ring buffer */
     for (col = 0; col < 32U; col++) {
@@ -238,11 +239,30 @@ static void gameplay_init(void)
 
 static void gameplay_update(void)
 {
-    uint8_t  joy        = joypad();
-    uint8_t  joy_press  = (uint8_t)(joy & ~prev_joy);
+    uint8_t  joy;
+    uint8_t  joy_press;
     uint8_t  events;
     uint16_t min_world_x;
     uint8_t  cam_tile, needed_col;
+
+    /* --- Hardware register + VRAM updates (VBlank window) ---
+     * main() calls vsync() immediately before run_current_state(), so
+     * this function is entered right at the start of VBlank.  Commit the
+     * scroll register and stream any pending BG column now while VRAM
+     * and registers are safely accessible.  No wait_vbl_done() needed
+     * here because we are already inside VBlank.                        */
+    SCX_REG = camera_x;
+
+    cam_tile   = (uint8_t)(camera_x >> 3);
+    needed_col = (uint8_t)(cam_tile + 21U);
+    if (needed_col < BG_GAMEPLAY_MAP_WIDTH && needed_col >= bg_stream_right) {
+        load_bg_column(bg_stream_right);
+        bg_stream_right++;
+    }
+
+    /* --- Game logic (runs during active display) --- */
+    joy       = joypad();
+    joy_press = (uint8_t)(joy & ~prev_joy);
 
     /* --- Countdown timer --- */
     if (time_remaining > 0U) {
@@ -316,15 +336,6 @@ static void gameplay_update(void)
         collision_cooldown = COLLISION_COOLDOWN;
     }
 
-    /* --- Column streaming (rightward only) ---
-     * Pre-load columns just off the right edge of the screen.           */
-    cam_tile   = (uint8_t)(camera_x >> 3);
-    needed_col = (uint8_t)(cam_tile + 21U);
-    if (needed_col < BG_GAMEPLAY_MAP_WIDTH && needed_col >= bg_stream_right) {
-        load_bg_column(bg_stream_right);
-        bg_stream_right++;
-    }
-
     prev_joy = joy;
 }
 
@@ -332,7 +343,9 @@ static void gameplay_cleanup(void)
 {
     player_cleanup();
     enemy_cleanup();
-    HIDE_WIN;
+    /* don't hide the window here – leaving it visible avoids a one-frame
+       blink when the level is reset after falling.  gameover_init() and
+       state_win already hide the HUD when appropriate. */
     SCX_REG = 0;
 }
 

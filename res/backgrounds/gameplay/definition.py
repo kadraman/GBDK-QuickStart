@@ -8,7 +8,7 @@ the extra 28 tiles provide 224 pixels of smooth horizontal scroll.
 Column streaming is required in gameplay C code to handle the 48-tile map
 in the 32-tile-wide GBC hardware background ring buffer.
 
-Tile index list (16 tiles)
+Tile index list (18 tiles)
 --------------------------
   0  Sky solid
   1  Cloud top-left
@@ -25,7 +25,9 @@ Tile index list (16 tiles)
  12  Grass top
  13  Dirt
  14  Deep ground
- 15  Platform block (stone, player can land on top)
+ 15  Platform block (stone, solid from all sides)
+ 16  Finish flag (visual indicator at level end)
+ 17  Platform ledge (thin plank, one-way: land on top only)
 
 Palette layout
 --------------
@@ -60,20 +62,13 @@ PALETTE_COLORS = [
     ( 80,  50,  20),  # 3 dirt dark
 ]
 
-PNG_PALETTE = [
-    (155, 200, 234),  # 0 sky blue
-    (255, 255, 255),  # 1 white / cloud
-    ( 60, 150,  60),  # 2 green
-    ( 40,  80,  20),  # 3 dark
-]
-
 S = 0  # sky
 W = 1  # white / cloud
 G = 2  # green (foliage / grass)
 D = 3  # dark  (tree outline / dirt)
 
 # ---------------------------------------------------------------------------
-# 8x8 tile definitions (16 tiles)
+# 8x8 tile definitions (17 tiles, including finish flag)
 # ---------------------------------------------------------------------------
 TILES = [
     # 0: Sky solid
@@ -140,24 +135,24 @@ TILES = [
      [S,S,S,S,S,S,S,S]],
 
     # 7: Tree foliage top-left
-    [[S,S,S,D,G,G,G,G],
+    [[S,S,S,D,D,D,D,D],
      [S,S,D,G,G,G,G,G],
      [S,D,G,G,G,G,G,G],
      [D,G,G,G,G,G,G,G],
-     [G,G,G,G,G,G,G,G],
-     [G,G,G,G,G,G,G,G],
-     [G,G,G,G,G,G,G,G],
-     [G,G,G,G,G,G,G,G]],
+     [D,G,G,G,G,G,G,G],
+     [D,D,G,G,G,G,G,G],
+     [D,G,G,G,G,G,G,G],
+     [D,G,G,G,G,G,G,G]],
 
     # 8: Tree foliage top-right
-    [[G,G,G,G,D,S,S,S],
+    [[D,D,D,D,D,S,S,S],
      [G,G,G,G,G,D,S,S],
      [G,G,G,G,G,G,D,S],
      [G,G,G,G,G,G,G,D],
-     [G,G,G,G,G,G,G,G],
-     [G,G,G,G,G,G,G,G],
-     [G,G,G,G,G,G,G,G],
-     [G,G,G,G,G,G,G,G]],
+     [G,G,G,G,G,G,G,D],
+     [G,G,G,G,G,G,D,D],
+     [G,G,G,G,G,G,G,D],
+     [G,G,G,G,G,G,G,D]],
 
     # 9: Tree foliage bottom-left
     [[G,G,G,G,G,G,G,G],
@@ -223,8 +218,45 @@ TILES = [
      [D,G,G,G,D,G,G,D],
      [D,G,G,G,D,G,G,D],
      [D,D,D,D,D,D,D,D]],
+
+    # 16: Finish flag (uses same palette as ground tiles)
+    [[S,D,D,D,D,D,S,S],   # D→3 = dirt dark (flag outline)
+     [S,D,D,W,W,W,W,D],   # W→1 = white (flag face)
+     [S,D,D,W,W,W,W,D],
+     [S,D,D,D,D,D,S,S],
+     [S,D,D,D,S,S,S,S],
+     [S,D,D,D,S,S,S,S],
+     [S,D,D,D,S,S,S,S],
+     [D,D,D,D,D,D,D,D]],
+
+    # 17: Platform ledge (thin plank) – one-way, top surface only.
+    #     COLLISION_TILE_DOWN_IDS only: jump up through from below, land on top.
+    #     Uses palette 1 (ground palette).  Pixel indices interpreted as:
+    #       S=0 → grass-light (120,200,80)  W=1 → grass-mid (80,160,80)
+    #       G=2 → stone-brown (120,80,40)   D=3 → dirt-dark (80,50,20)
+    #     Rows 0-1: stone-brown top surface (landing zone, no green)
+    #     Row 2:    alternating detail row (stone brickwork)
+    #     Rows 3-7: dark underside
+    [[G,G,G,G,G,G,G,G],   # row 0 – stone-brown top face (player lands here)
+     [G,G,G,G,G,G,G,G],   # row 1 – stone-brown face
+     [G,D,G,D,G,D,G,D],   # row 2 – stone brick detail
+     [D,D,D,D,D,D,D,D],   # row 3 – dark shadow
+     [D,D,D,D,D,D,D,D],   # row 4 – dark underside
+     [D,D,D,D,D,D,D,D],   # row 5 – dark underside
+     [D,D,D,D,D,D,D,D],   # row 6 – dark underside
+     [D,D,D,D,D,D,D,D]],  # row 7 – dark underside
+
+    # 18: Another Dirt
+    [[D,D,D,D,D,D,D,D],
+     [D,D,D,S,D,D,S,D],
+     [D,D,G,D,G,D,D,D],
+     [D,D,D,D,S,D,D,D],
+     [D,D,S,D,G,D,G,D],
+     [D,D,D,D,D,D,D,D],
+     [D,S,D,S,G,D,S,D],
+     [D,D,D,D,D,D,D,D]],
 ]
-assert len(TILES) == 16, f"Expected 16 tiles, got {len(TILES)}"
+assert len(TILES) == 19, f"Expected 19 tiles, got {len(TILES)}"
 
 # ---------------------------------------------------------------------------
 # 48x18 tilemap
@@ -232,14 +264,22 @@ assert len(TILES) == 16, f"Expected 16 tiles, got {len(TILES)}"
 _SKY    = 0
 _CTL,_CTC,_CTR = 1,2,3   # cloud top
 _CBL,_CBC,_CBR = 4,5,6   # cloud bottom
-_FTL,_FTR = 7,8           # foliage top
-_FBL,_FBR = 9,10          # foliage bottom
-_TRK    = 11               # trunk
+_FTL,_FTR = 7,8          # foliage top
+_FBL,_FBR = 9,10         # foliage bottom
+_TRK    = 11             # trunk
 _GRASS  = 12
 _DIRT   = 13
 _DEEP   = 14
-_PLAT   = 15               # platform block
+_PLAT   = 15            # platform block (solid all sides)
+_FLAG   = 16            # finish flag (uses same palette as ground tiles)
+_LEDGE  = 17            # platform ledge (one-way: land on top only)
+_ANOTHER_DIRT = 18       # extra dirt tile for variety (not used in original map)
 
+# world-X where player wins; must match C CHECKPOINT_X16 = 368
+# (flag tile lies one column to the right of the original checkpoint)
+CHECKPOINT_X16 = 368
+# map column corresponding to end of level (flag location)
+CHECKPOINT_COL = (CHECKPOINT_X16 // 8)
 MAP_W, MAP_H = 48, 18
 
 # Trees: (left_col, right_col)
@@ -253,7 +293,10 @@ _PITS = [(10,12), (21,24), (34,38)]
 
 # Platform blocks: cols where row 9 has a platform tile
 # Placed on solid ground sections, before or between pits
-_PLAT_COLS = {7, 15, 16, 27, 28, 42}
+_PLAT_COLS = {7, 27, 28, 42}
+
+# Air platforms – floating blocks above the trees (row 6)
+_AIR_PLAT_COLS = {12, 25, 36}
 
 def _is_pit(col):
     for (ps, pe) in _PITS:
@@ -270,11 +313,17 @@ def _build_tilemap():
 
             pit = _is_pit(col)
 
-            if not pit:
+            # air platforms should show regardless of pits
+            if row == 6 and col in _AIR_PLAT_COLS:
+                tile = _LEDGE
+            elif not pit:
                 if row >= 14:
-                    tile = _DEEP
-                elif row >= 11:
                     tile = _DIRT
+                elif row >= 11:
+                    tile = _ANOTHER_DIRT
+                elif row == 9 and col == CHECKPOINT_COL:
+                    # place finish-flag on the tile above the grass row
+                    tile = _FLAG
                 elif row == 10:
                     tile = _GRASS
                 elif row == 9 and col in _PLAT_COLS:
@@ -309,6 +358,31 @@ TILEMAP_FLAT = _build_tilemap()
 assert len(TILEMAP_FLAT) == MAP_W * MAP_H
 
 # ---------------------------------------------------------------------------
+# COLLISION_TILE_DOWN_IDS  (landing / top-surface collision only)
+# A sprite falling onto any of these tile IDs is stopped and snapped to the
+# top of that tile.  Sprites may pass through from the sides or below.
+#   12 = Grass top   (ground surface)
+#   13 = Dirt        (subsurface)
+#   14 = Deep ground (bottom fill)
+#   15 = Platform block
+#   17 = Platform ledge (thin plank, sky platforms)
+#   18 = Another Dirt (rows 11-13 in new tilemap)
+# ---------------------------------------------------------------------------
+COLLISION_TILE_DOWN_IDS = [12, 13, 14, 15, 17, 18]
+
+# ---------------------------------------------------------------------------
+# COLLISION_TILE_IDS  (full multi-directional collision)
+# These tiles block sprites from ALL directions (left, right, above, below).
+# Platform ledge (17) is intentionally excluded – it is one-way only.
+#   12 = Grass top
+#   13 = Dirt
+#   14 = Deep ground
+#   15 = Platform block (solid all sides)
+#   18 = Another Dirt (rows 11-13 in new tilemap)
+# ---------------------------------------------------------------------------
+COLLISION_TILE_IDS = [12, 13, 14, 15, 18]
+
+# ---------------------------------------------------------------------------
 # Per-tile palette attribute map
 # ---------------------------------------------------------------------------
 ATTR_MAP = []
@@ -316,8 +390,10 @@ for i in range(MAP_W * MAP_H):
     row = i // MAP_W
     col = i % MAP_W
     # Platform tiles use palette 1; ground rows use palette 1; sky rows palette 0
-    if TILEMAP_FLAT[i] == _PLAT:
-        ATTR_MAP.append(0x01)
+    if TILEMAP_FLAT[i] == _LEDGE:
+        ATTR_MAP.append(0x01)  # platform ledge uses palette 1 (same as ground)
+    elif TILEMAP_FLAT[i] == _PLAT:
+        ATTR_MAP.append(0x01)  # platform block uses palette 1 (same as ground)
     elif row < 10:
         ATTR_MAP.append(0x00)
     else:

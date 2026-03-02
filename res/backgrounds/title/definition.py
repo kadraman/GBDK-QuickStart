@@ -52,13 +52,6 @@ PALETTE_COLORS = [
     ( 20,  10,   5),  # 3 deep dark ground
 ]
 
-PNG_PALETTE = [
-    (  0,   0,  60),  # 0 night sky
-    (255, 255, 180),  # 1 moon / star white
-    ( 30,  30, 100),  # 2 mountain
-    ( 15,  15,  50),  # 3 dark
-]
-
 N = 0  # night sky
 M = 1  # moon / star bright
 U = 2  # mountain

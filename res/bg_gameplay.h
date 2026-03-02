@@ -5,14 +5,18 @@
 #include <gb/cgb.h>
 #include <stdint.h>
 
-#define BG_GAMEPLAY_TILE_COUNT    16U
+#define BG_GAMEPLAY_TILE_COUNT    19U
 #define BG_GAMEPLAY_PALETTE_COUNT 2U
 #define BG_GAMEPLAY_MAP_WIDTH     48U
 #define BG_GAMEPLAY_MAP_HEIGHT    18U
 
 extern const palette_color_t bg_gameplay_palettes[8];
-extern const uint8_t bg_gameplay_tiles[256];
+extern const uint8_t bg_gameplay_tiles[304];
 extern const uint8_t bg_gameplay_map[864];
 extern const uint8_t bg_gameplay_attr_map[864];
+#define BG_GAMEPLAY_COLLISION_DOWN_TILE_COUNT 6U
+extern const uint8_t bg_gameplay_collision_down_tiles[6];
+#define BG_GAMEPLAY_COLLISION_TILE_COUNT 5U
+extern const uint8_t bg_gameplay_collision_tiles[5];
 
 #endif

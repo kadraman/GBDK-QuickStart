@@ -41,6 +41,7 @@ static const palette_color_t hud_red_palette[4] = {
 };
 
 void main(void) {
+
     DISPLAY_OFF;
 
     /* --- GBC background palettes shared across all states --- */
