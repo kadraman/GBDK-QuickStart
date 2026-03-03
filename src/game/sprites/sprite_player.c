@@ -17,7 +17,7 @@
 /* -----------------------------------------------------------------------
  * Player physics constants
  * -------------------------------------------------------------------- */
-#define JUMP_VY          (-6)   /* initial jump velocity (negative = up) */
+#define JUMP_VY          (-5)   /* initial jump velocity (negative = up) */
 #define WALK_SPEED         1U   /* world pixels per frame                */
 #define GRAVITY_DELAY      3U   /* frames between gravity steps          */
 
@@ -31,7 +31,7 @@
 #define GROUND_WORLD_Y    64U   /* initial world_y when spawned on ground */
 #define MAX_FALL_WORLD_Y 160U   /* world_y at which player is considered dead */
 
-typedef enum { PSTATE_IDLE, PSTATE_WALK, PSTATE_JUMP } PlayerState;
+typedef enum { PSTATE_IDLE, PSTATE_WALK, PSTATE_JUMP, PSTATE_DIE } PlayerState;
 
 static Sprite      *_player_sprite;
 static uint16_t     _player_world_x16;   /* full 16-bit world X position  */
@@ -39,6 +39,9 @@ static int8_t       _player_vy;
 static uint8_t      _player_facing_r;
 static PlayerState  _player_state;
 static uint8_t      _gravity_delay_ctr;
+/* Death animation variables */
+static uint8_t      _death_bounce_count;
+static uint8_t      _death_timer;
 
 /* -----------------------------------------------------------------------
  * _has_ground_below
@@ -97,6 +100,8 @@ void player_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base)
     _player_state      = PSTATE_IDLE;
     _gravity_delay_ctr = 0U;
     _player_world_x16  = (uint16_t)start_x;
+    _death_bounce_count = 0U;
+    _death_timer = 0U;
 
     /* Player is a 16x16 graphic made from two 8x16 OBJ slots.  The
      * sprite manager needs the full visual width so hitbox/collision
@@ -191,7 +196,7 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
 
     /* --- Jump (A or B button, only when grounded) --- */
     if ((joy_press & J_A) || (joy_press & J_B)) {
-        if (_player_state != PSTATE_JUMP) {
+        if (_player_state != PSTATE_JUMP && _player_state != PSTATE_DIE) {
             _player_vy         = JUMP_VY;
             _gravity_delay_ctr = 0U;
             _player_state      = PSTATE_JUMP;
@@ -200,15 +205,46 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
     }
 
     /* --- Walking off an edge: start falling when no collideable tile below --- */
-    if (_player_state != PSTATE_JUMP &&
+    if (_player_state != PSTATE_JUMP && _player_state != PSTATE_DIE &&
         !_has_ground_below(_player_sprite->world_y, _player_world_x16)) {
         _player_state      = PSTATE_JUMP;
         _player_vy         = 0;
         _gravity_delay_ctr = 0U;
     }
 
+    /* --- Death state: Mario-style bouncing --- */
+    if (_player_state == PSTATE_DIE) {
+        _death_timer++;
+        
+        /* Apply death physics: bounce up and down */
+        new_y = (int16_t)_player_sprite->world_y + _player_vy;
+        if (new_y < 0) new_y = 0;
+        _player_sprite->world_y = (uint8_t)new_y;
+        
+        /* Apply gravity for death bounce */
+        _gravity_delay_ctr++;
+        if (_gravity_delay_ctr >= 2U) {  /* Faster gravity for death */
+            _gravity_delay_ctr = 0U;
+            _player_vy++;
+        }
+        
+        /* Check if hit ground for bouncing */
+        if (_player_vy >= 0 && new_y >= GROUND_WORLD_Y) {
+            _death_bounce_count++;
+            if (_death_bounce_count < 3U) {
+                /* Bounce again, but with less force each time */
+                _player_vy = (int8_t)(-4 + _death_bounce_count);  
+                _player_sprite->world_y = GROUND_WORLD_Y;
+            }
+        }
+        
+        /* After bouncing and some time, trigger game over */
+        if (_death_timer > 120U || _player_sprite->world_y >= MAX_FALL_WORLD_Y) {
+            events |= PLAYER_EVENT_DIED;  /* Signal death animation completed */
+        }
+    }
     /* --- Vertical physics --- */
-    if (_player_state == PSTATE_JUMP) {
+    else if (_player_state == PSTATE_JUMP) {
         new_y = (int16_t)_player_sprite->world_y + _player_vy;
         if (new_y < 0) new_y = 0;
 
@@ -282,7 +318,10 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
         (uint8_t)(_player_world_x16 - (uint16_t)(*camera_x));
 
     /* --- Animation selection --- */
-    if (_player_state == PSTATE_JUMP) {
+    if (_player_state == PSTATE_DIE) {
+        /* Show death animation frame */
+        tile_idx = (uint8_t)(PLAYER_ANIM_DIE_START);
+    } else if (_player_state == PSTATE_JUMP) {
         _player_sprite->anim_frame = (_player_vy < 0) ? 0U : 1U;
         tile_idx = (uint8_t)(PLAYER_ANIM_JUMP_START +
                               _player_sprite->anim_frame * PLAYER_TILES_PER_FRAME);
@@ -301,9 +340,15 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
                               _player_sprite->anim_frame * PLAYER_TILES_PER_FRAME);
     }
 
-    /* 16x16 player: OBJ 0 = left half, OBJ 1 = right half */
-    set_sprite_tile(0U, tile_idx);
-    set_sprite_tile(1U, (uint8_t)(tile_idx + 2U));
+    /* 16x16 player: when facing right, OBJ 0 = left tile, OBJ 1 = right tile
+     * when facing left, swap tile positions and flip both */
+    if (_player_facing_r) {
+        set_sprite_tile(0U, tile_idx);           /* left tile to left position */
+        set_sprite_tile(1U, (uint8_t)(tile_idx + 2U)); /* right tile to right position */
+    } else {
+        set_sprite_tile(0U, (uint8_t)(tile_idx + 2U)); /* right tile to left position */
+        set_sprite_tile(1U, tile_idx);           /* left tile to right position */
+    }
 
     /* --- Horizontal flip for left-facing --- */
     prop = get_sprite_prop(0U);
@@ -367,4 +412,18 @@ uint8_t player_is_facing_right(void)
 uint8_t player_is_jumping(void)
 {
     return (_player_state == PSTATE_JUMP) ? 1U : 0U;
+}
+
+void player_die(void)
+{
+    _player_state = PSTATE_DIE;
+    _player_vy = -8;  /* Initial upward velocity for bounce */
+    _death_bounce_count = 0U;
+    _death_timer = 0U;
+    _gravity_delay_ctr = 0U;
+}
+
+uint8_t player_is_dying(void)
+{
+    return (_player_state == PSTATE_DIE) ? 1U : 0U;
 }

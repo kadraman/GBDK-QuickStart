@@ -8,21 +8,15 @@ SIZE = '16x16': each frame is a flat list of 16 strings, each exactly
   right-top (rows  0-7, cols 8-15)
   right-bot (rows 8-15, cols 8-15)
 
-Art occupies the left half; the right half is transparent, giving the
-sprite its 16-wide OBJ canvas while keeping art in 8 columns.
-
-Pixels are placed in the lower portion of the 16×16 grid (row 15 =
-ground contact) so the player appears to stand on the ground.
-
 The character faces RIGHT by default.
 Left-facing is achieved in C by setting S_FLIPX on both OBJ slots.
 
 Animation list
 --------------
-  idle (2 frames)  – stationary stance
-  walk (4 frames)  – 4-step walking cycle
-  jump (2 frames)  – ascending / descending
-  die  (3 frames)  – hit, falling, lying flat
+    idle (1 frame)   - stationary stance
+    walk (3 frames)  - 3-step walking cycle
+    jump (2 frames)  - ascent then fall frames
+    die  (1 frame)   - hit by enemy or hazard
 """
 
 NAME = 'player'
@@ -40,151 +34,135 @@ PALETTE = [
 PIXEL_CHARS = {'.': 0, 'Y': 1, 'B': 2, 'D': 3}
 
 # ---------------------------------------------------------------------------
-# Shared top section (rows 0-8): head + upper body
-# Each list is 9 strings of 16 chars.
+# Animations are defined as lists of frames, and each frame is a list of 16 strings.
 # ---------------------------------------------------------------------------
-_TOP_NORMAL = [
-    '................',   # row  0  sky
-    '................',   # row  1  sky
-    '...DDDD.........',   # row  2  head outline top
-    '..DYYYYD........',   # row  3  face
-    '..DYYDYD........',   # row  4  face with eye
-    '..DYYYYD........',   # row  5  face lower
-    '..DBBBD.........',   # row  6  body top
-    '.DBBBBD.........',   # row  7  body + left-arm outline
-    '..BBBBD.........',   # row  8  body
+_FRAME_IDLE = [
+    '................', 
+    '................',
+    '................',
+    '................',
+    '......DDD.......',
+    '.....DDDDDDD....',
+    '....DDDYYDY.....',
+    '...DDYDDYYYY....',
+    '...DDYYYYDDY....',
+    '.....YYYYYY.....',
+    '....DDBDDB......',
+    '...DDDBDDBDD....',
+    '...YYDBBBBDDY...',
+    '...YYBBBBBBYY...',
+    '.....DD..DD.....',
+    '....DDD..DDD....',
 ]
-_TOP_JUMP = [
+_FRAME_WALK_1 = [
+    '................', 
     '................',
     '................',
-    '...DDDD.........',
-    '..DYYYYD........',
-    '..DYYDYD........',
-    '..DYYYYD........',
-    '.DBBBBD.........',   # arms wide
-    '.DBBBBD.........',
-    '..BBBBD.........',
+    '.......DDD......',
+    '......DDDDDDD...',
+    '.....DDDYYDY....',
+    '....DDYDDYYYY...',
+    '....DDYYYYDDY...',
+    '......YYYYYY....',
+    '....DDDDBD......',
+    '..YYDDDDBDDYYY..',
+    '..YY.DDDBBDDYY..',
+    '....BBBBBB..D...',
+    '...DBBBBBBBDD...',
+    '...DDB...BBDD...',
+    '....DDD.........',
 ]
-_TOP_HIT = [
+_FRAME_WALK_2 = [
+    '................', 
     '................',
     '................',
-    '...DDDD.........',
-    '..DDDDD.........',   # furrowed brow
-    '..DYYDYD........',
-    '..DDDDD.........',   # clenched mouth
-    '..DBBBD.........',
-    '.DBBBBD.........',
-    '..BBBBD.........',
+    '......DDD.......',
+    '.....DDDDDDD....',
+    '....DDDYYDY.....',
+    '...DDYDDYYYY....',
+    '...DDYYYYDDY....',
+    '.....YYYYYY.....',
+    '....DDD.D.......',
+    '...DDDDYDD......',
+    '...DDYYBBBB.....',
+    '...BBYBBBBB.....',
+    '....BBBBDD......',
+    '.....DDDDDD.....',
+    '.....DDDD.......',
+]
+_FRAME_WALK_3 = [
+    '................', 
+    '................',
+    '................',
+    '................',
+    '......DDD.......',
+    '.....DDDDDDD....',
+    '....DDDYYDY.....',
+    '...DDYDDYYYY....',
+    '...DDYYYYDDY....',
+    '.....YYYYYY.....',
+    '....DDDDBD.YY...',
+    '...YDDDDDDYYY...',
+    '..YYBBBBBBB.....',
+    '...DBBBBBB......',
+    '..DDBB.DD.......',
+    '..D....DDD......',
+]
+_FRAME_JUMP = [
+    '................',
+    '................',
+    '................',
+    '............YYY.',
+    '......DDD...YYY.',
+    '.....DDDDDDDDD..',
+    '....DDDYYDY.DD..',
+    '...DDYDDYYYYDD..',
+    '...DDYYYYDDDD...',
+    '.....YYYYYYD....',
+    '...DDDBDDBD.....',
+    '.YDDDDBBDDB..D..',
+    '.YY.BBBBBBBBDD..',
+    '.Y.DBBBBBBBBDD..',
+    '..DDDBBBBB......',
+    '..D..BB.........',
+]
+_FRAME_FALL = [
+    '................',
+    '................',
+    '................',
+    '......DDD.......',
+    '...DDDDDDDD.....',
+    '....YDYYDDDD....',
+    '...YYYDYDYDYY...',
+    '....DDYYYYDYY...',
+    '...DDYYYBBB.....',
+    '...DDDDDYYBB....',
+    '...DDDDDYBBB....',
+    '....DDDBDDDB....',
+    '......BDDDB.....',
+    '......BDDBD.D...',
+    '........BDDDD...',
+    '.........DDD....',
+]
+_FRAME_DIE = [
+    '................',
+    '................',
+    '................',
+    '......DDDD......',
+    '...Y.DDDDDD.Y...',
+    '..YYDYDYYDYDYY..',
+    '..YDDDYYYYDDDY..',
+    '...DDYDDDDYDD...',
+    '....DYYYYYYD....',
+    '....DDBYYBDD....',
+    '..D.BBBDDBBB.D..',
+    '..DDDBBBBBBDDD..',
+    '..DDDBBBBBBDDD..',
+    '.....BBBBBB.....',
+    '................',
+    '................',
 ]
 
-# ---------------------------------------------------------------------------
-# Shared bottom section (rows 9-15): belt + legs + boots
-# Each list is 7 strings of 16 chars.
-# ---------------------------------------------------------------------------
-_BOT_IDLE = [
-    '..DDDDD.........',   # row  9  belt
-    '...BB...........',   # row 10  legs
-    '...BB...........',   # row 11
-    '...BB...........',   # row 12
-    '...BB...........',   # row 13
-    '..DDDD..........',   # row 14  boots
-    '..DDDD..........',   # row 15  boots – ground contact
-]
-_BOT_WALK1 = [           # right leg forward, left leg back
-    '..DDDDD.........',
-    '..B.B...........',
-    '..B.B...........',
-    '..B.B...........',
-    '.DB.B...........',
-    '.D..B...........',
-    '.D..............',
-]
-_BOT_WALK3 = [           # left leg forward, right leg back
-    '..DDDDD.........',
-    '..B.B...........',
-    '..B.B...........',
-    '..B.B...........',
-    '..B.BD..........',
-    '...BD...........',
-    '...D............',
-]
-_BOT_JUMP_UP = [         # ascending: knees tucked
-    '..DDDDD.........',
-    '................',
-    '..BBB...........',
-    '..BBB...........',
-    '..B.B...........',
-    '.D..D...........',
-    '.D..D...........',
-]
-_BOT_JUMP_DN = [         # descending: legs stretched
-    '..DDDDD.........',
-    '...BB...........',
-    '...BB...........',
-    '...BB...........',
-    '..B.B...........',
-    '..D.D...........',
-    '..D.D...........',
-]
-_BOT_DIE0 = [            # stagger – one leg buckled
-    '..DDDDD.........',
-    '...B............',
-    '...B............',
-    '..BB............',
-    '..BB............',
-    '..D.............',
-    '.D..............',
-]
-_BOT_DIE1 = [            # falling sideways
-    '..DDDDD.........',
-    '..BBB...........',
-    '.BBBB...........',
-    '.BBBB...........',
-    '.BBBB...........',
-    '.DD.............',
-    '.D..............',
-]
-
-# Die-2 is a special flat-on-ground pose using a single 16-row frame
-_DIE2 = [
-    '................',
-    '................',
-    '................',
-    '................',
-    '................',
-    '................',
-    '................',
-    '.DDDDDDD........',   # body outline (horizontal)
-    'DYYYYYDDD.......',   # head + body + legs
-    '.DBBBBBBD.......',
-    '.DDDDDDD........',
-    '................',
-    '................',
-    '................',
-    '................',
-    '................',
-]
-
-# ---------------------------------------------------------------------------
-# Full-frame definitions – merge top and bottom halves into 16-row lists
-# This makes the animation table easier to read and eliminates the need
-# to concatenate halves in multiple places.  The original _TOP_* and
-# _BOT_* lists are still available in case you want to tweak a single-half
-# independently.
-# ---------------------------------------------------------------------------
-_FRAME_IDLE0   = _TOP_NORMAL + _BOT_IDLE
-_FRAME_IDLE1   = _TOP_NORMAL + _BOT_IDLE
-_FRAME_WALK0   = _TOP_NORMAL + _BOT_IDLE
-_FRAME_WALK1   = _TOP_NORMAL + _BOT_WALK1
-_FRAME_WALK2   = _TOP_NORMAL + _BOT_IDLE
-_FRAME_WALK3   = _TOP_NORMAL + _BOT_WALK3
-_FRAME_JUMP_UP = _TOP_JUMP   + _BOT_JUMP_UP
-_FRAME_JUMP_DN = _TOP_JUMP   + _BOT_JUMP_DN
-_FRAME_HIT0    = _TOP_HIT    + _BOT_DIE0
-_FRAME_HIT1    = _TOP_HIT    + _BOT_DIE1
-
-# convenience alias: the first idle frame represents the "normal" sprite
-_NORMAL = _FRAME_IDLE0
 
 # ---------------------------------------------------------------------------
 # Animation speeds (vblanks per frame)
@@ -201,22 +179,18 @@ ANIM_SPEEDS = {
 # ---------------------------------------------------------------------------
 ANIMATIONS = {
     'idle': [
-        _FRAME_IDLE0,              # frame 0
-        _FRAME_IDLE1,              # frame 1 (same – extend for blink if desired)
+        _FRAME_IDLE,
     ],
     'walk': [
-        _FRAME_WALK0,              # frame 0: neutral
-        _FRAME_WALK1,              # frame 1: right leg forward
-        _FRAME_WALK2,              # frame 2: neutral
-        _FRAME_WALK3,              # frame 3: left leg forward
+        _FRAME_WALK_1,
+        _FRAME_WALK_2,
+        _FRAME_WALK_3,
     ],
     'jump': [
-        _FRAME_JUMP_UP,            # frame 0: ascending
-        _FRAME_JUMP_DN,            # frame 1: descending
+        _FRAME_JUMP,
+        _FRAME_FALL,
     ],
     'die': [
-        _FRAME_HIT0,               # frame 0: hit
-        _FRAME_HIT1,               # frame 1: falling
-        _DIE2,                     # frame 2: flat on ground
+        _FRAME_DIE,
     ],
 }

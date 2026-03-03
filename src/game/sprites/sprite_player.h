@@ -15,6 +15,7 @@
 /* Return value flags from player_update() */
 #define PLAYER_EVENT_JUMPED    0x01U  /* player jumped this frame     */
 #define PLAYER_EVENT_FELL_GAP  0x02U  /* player fell into a gap       */
+#define PLAYER_EVENT_DIED      0x04U  /* death animation completed    */
 
 /* Initialise and allocate the player sprite.
  * start_x   : starting world-X position
@@ -45,5 +46,11 @@ uint8_t player_is_jumping(void);
 
 /* Return the player's full 16-bit world X position. */
 uint16_t player_get_world_x16(void);
+
+/* Trigger the player death animation. */
+void player_die(void);
+
+/* Return 1 if the player is currently in the death state. */
+uint8_t player_is_dying(void);
 
 #endif

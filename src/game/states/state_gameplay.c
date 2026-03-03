@@ -312,6 +312,16 @@ static void gameplay_update(void)
         return;
     }
 
+    /* --- Death animation completed: check game over --- */
+    if (events & PLAYER_EVENT_DIED) {
+        if (lives == 0U) {
+            switch_state(STATE_GAME_OVER);
+        } else {
+            switch_state(STATE_GAMEPLAY);  /* restart from beginning */
+        }
+        return;
+    }
+
     /* --- Update enemy (handles patrol, animation, hardware move) --- */
     enemy_update(camera_x);
 
@@ -324,15 +334,13 @@ static void gameplay_update(void)
     /* --- Sprite collision: player vs enemy --- */
     if (collision_cooldown > 0U) {
         collision_cooldown--;
-    } else if (sprites_collide(player_get_sprite(), enemy_get_sprite())) {
+    } else if (sprites_collide(player_get_sprite(), enemy_get_sprite()) && !player_is_dying()) {
         if (lives > 0U) {
             lives--;
             hud_update_lives();
         }
-        if (lives == 0U) {
-            switch_state(STATE_GAME_OVER);
-            return;
-        }
+        /* Start death animation instead of immediate game over */
+        player_die();
         collision_cooldown = COLLISION_COOLDOWN;
     }
 
