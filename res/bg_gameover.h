@@ -2,6 +2,7 @@
 #ifndef BG_GAMEOVER_H
 #define BG_GAMEOVER_H
 
+#include <gbdk/platform.h>
 #include <gb/cgb.h>
 #include <stdint.h>
 
@@ -10,9 +11,14 @@
 #define BG_GAMEOVER_MAP_WIDTH     20U
 #define BG_GAMEOVER_MAP_HEIGHT    18U
 
+BANKREF_EXTERN(bg_gameover_palettes)
+BANKREF_EXTERN(bg_gameover_tiles)
+BANKREF_EXTERN(bg_gameover_map)
+
 extern const palette_color_t bg_gameover_palettes[8];
 extern const uint8_t bg_gameover_tiles[128];
 extern const uint8_t bg_gameover_map[360];
+BANKREF_EXTERN(bg_gameover_attr_map)
 extern const uint8_t bg_gameover_attr_map[360];
 
 #endif

@@ -1,3 +1,6 @@
+#pragma bank 255
+
+#include <gbdk/platform.h>
 #include <gb/gb.h>
 #include <gb/cgb.h>
 #include <stddef.h>
@@ -45,7 +48,8 @@ static uint8_t _enemy_has_ground_at(uint16_t world_x16)
     return 0U;
 }
 
-void enemy_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base)
+BANKREF(enemy_init)
+void enemy_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base) BANKED
 {
     _enemy_dx      = 1;
     _enemy_is_idle = 0U;
@@ -64,7 +68,8 @@ void enemy_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base)
                 (uint8_t)(_enemy_sprite->world_y + 16U));
 }
 
-void enemy_update(uint8_t camera_x)
+BANKREF(enemy_update)
+void enemy_update(uint8_t camera_x) BANKED
 {
     uint16_t next_x16;
     int16_t  screen_x;
@@ -153,7 +158,8 @@ void enemy_update(uint8_t camera_x)
     }
 }
 
-void enemy_cleanup(void)
+BANKREF(enemy_cleanup)
+void enemy_cleanup(void) BANKED
 {
     if (_enemy_sprite) {
         sprite_manager_free(_enemy_sprite);
@@ -161,7 +167,8 @@ void enemy_cleanup(void)
     }
 }
 
-Sprite* enemy_get_sprite(void)
+BANKREF(enemy_get_sprite)
+Sprite* enemy_get_sprite(void) BANKED
 {
     return _enemy_sprite;
 }

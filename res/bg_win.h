@@ -2,6 +2,7 @@
 #ifndef BG_WIN_H
 #define BG_WIN_H
 
+#include <gbdk/platform.h>
 #include <gb/cgb.h>
 #include <stdint.h>
 
@@ -10,9 +11,14 @@
 #define BG_WIN_MAP_WIDTH     20U
 #define BG_WIN_MAP_HEIGHT    18U
 
+BANKREF_EXTERN(bg_win_palettes)
+BANKREF_EXTERN(bg_win_tiles)
+BANKREF_EXTERN(bg_win_map)
+
 extern const palette_color_t bg_win_palettes[8];
 extern const uint8_t bg_win_tiles[160];
 extern const uint8_t bg_win_map[360];
+BANKREF_EXTERN(bg_win_attr_map)
 extern const uint8_t bg_win_attr_map[360];
 
 #endif

@@ -1,3 +1,6 @@
+#pragma bank 255
+
+#include <gbdk/platform.h>
 #include <gb/gb.h>
 #include <gb/cgb.h>
 #include <stddef.h>
@@ -93,7 +96,8 @@ static uint8_t _has_ground_below(uint8_t world_y, uint16_t world_x16)
     return 0U;
 }
 
-void player_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base)
+BANKREF(player_init)
+void player_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base) BANKED
 {
     _player_vy         = 0;
     _player_facing_r   = 1U;
@@ -123,8 +127,9 @@ void player_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base)
     sprite_manager_update_hw(_player_sprite, 0U, 0U);
 }
 
+BANKREF(player_update)
 uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
-                      uint16_t min_world_x)
+                      uint16_t min_world_x) BANKED
 {
     uint8_t     events  = 0U;
     uint8_t     moved   = 0U;
@@ -252,13 +257,18 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
 
         /* Landing from above: top-surface tiles (one-way platforms and ledges included) */
         if (_player_vy >= 0 &&
-            sprite_manager_tile_collision(
-                _player_sprite, _player_world_x16,
-                bg_gameplay_map, BG_GAMEPLAY_MAP_WIDTH, BG_GAMEPLAY_MAP_HEIGHT,
-                bg_gameplay_collision_down_tiles, BG_GAMEPLAY_COLLISION_DOWN_TILE_COUNT)) {
-            /* Snap player to the top of the tile the feet entered */
-            snap_row = (uint8_t)(((uint8_t)new_y + _player_sprite->height) >> 3);
-            new_y = (int16_t)(snap_row * 8U) - (int16_t)_player_sprite->height;
+            _has_ground_below((uint8_t)new_y, _player_world_x16)) {
+            /* Snap player to the top of the tile the feet entered.
+             * Use the sprite hitbox (hitbox_y + hitbox_h or full height)
+             * so snapping aligns with the collision box, not the visual
+             * sprite height. This prevents landing halfway up platforms
+             * when the hitbox is inset. */
+            uint8_t hy = _player_sprite->hitbox_y;
+            uint8_t ah = _player_sprite->hitbox_h ? _player_sprite->hitbox_h
+                                                  : _player_sprite->height;
+            uint8_t feet_y = (uint8_t)((uint8_t)new_y + hy + ah);
+            snap_row = (uint8_t)(feet_y >> 3);
+            new_y = (int16_t)(snap_row * 8U) - (int16_t)(hy + ah);
             _player_sprite->world_y = (uint8_t)new_y;
             _player_vy         = 0;
             _gravity_delay_ctr = 0U;
@@ -386,7 +396,8 @@ uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
     return events;
 }
 
-void player_cleanup(void)
+BANKREF(player_cleanup)
+void player_cleanup(void) BANKED
 {
     if (_player_sprite) {
         sprite_manager_free(_player_sprite);
@@ -394,27 +405,32 @@ void player_cleanup(void)
     }
 }
 
-Sprite* player_get_sprite(void)
+BANKREF(player_get_sprite)
+Sprite* player_get_sprite(void) BANKED
 {
     return _player_sprite;
 }
 
-uint16_t player_get_world_x16(void)
+BANKREF(player_get_world_x16)
+uint16_t player_get_world_x16(void) BANKED
 {
     return _player_world_x16;
 }
 
-uint8_t player_is_facing_right(void)
+BANKREF(player_is_facing_right)
+uint8_t player_is_facing_right(void) BANKED
 {
     return _player_facing_r;
 }
 
-uint8_t player_is_jumping(void)
+BANKREF(player_is_jumping)
+uint8_t player_is_jumping(void) BANKED
 {
     return (_player_state == PSTATE_JUMP) ? 1U : 0U;
 }
 
-void player_die(void)
+BANKREF(player_die)
+void player_die(void) BANKED
 {
     _player_state = PSTATE_DIE;
     _player_vy = -8;  /* Initial upward velocity for bounce */
@@ -423,7 +439,8 @@ void player_die(void)
     _gravity_delay_ctr = 0U;
 }
 
-uint8_t player_is_dying(void)
+BANKREF(player_is_dying)
+uint8_t player_is_dying(void) BANKED
 {
     return (_player_state == PSTATE_DIE) ? 1U : 0U;
 }

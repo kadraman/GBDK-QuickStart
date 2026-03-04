@@ -34,15 +34,23 @@ endif
 
 LCC         = $(GBDK_HOME)/bin/lcc
 PNG2ASSET   = $(GBDK_HOME)/bin/png2asset
+ROMUSAGE   	= $(GBDK_HOME)/bin/romusage
 
 PROJECTNAME = quickstart
 SRCDIR      = src
 OBJDIR      = obj
 RESDIR      = res
 
-# GBC mode flag + joined mode
-LCCFLAGS    = -Wm-yc
-LCCFLAGS   += -Wl-j
+# GBC + MBC + Autobanking related flags:
+# -Wl-yt0x1B      Set cartridge type to 0x1B (MBC5 with RAM and battery)
+# -Wm-yc          Enable Game Boy Color (CGB) mode
+# -Wl-j           Produce joined/contiguous ROM output (final build)
+# -Wl-yoA         Enable automatic bank area sizing (linker adjusts based on usage)
+# -Wm-ya4         Autobanking allocator heuristic parameter (balance bank filling)
+# -autobank       Enable automatic bank assignment by linker
+# -Wb-ext=.rel    Use .rel extension for bank/relocation files
+# -Wb-v           Verbose banker output (show bank assignments)
+LCCFLAGS 	= -Wl-yt0x1B -Wm-yc -Wl-j -Wl-yoA -Wm-ya4 -autobank -Wb-ext=.rel -Wb-v
 
 BINS        = $(OBJDIR)/$(PROJECTNAME).gbc
 
@@ -63,7 +71,10 @@ INCLUDES    = -I$(SRCDIR)/lib/include -I$(SRCDIR)/game -I$(SRCDIR)/game/states -
 PNG_ASSETS  = $(RESDIR)/background.png $(RESDIR)/font.png $(RESDIR)/player.png $(RESDIR)/enemy.png \
               $(RESDIR)/bg_title.png $(RESDIR)/bg_gameover.png $(RESDIR)/bg_win.png
 
-.PHONY: all generate convert clean clean-generated run
+# Generated asset basenames (without extensions) - used for clean-generated target
+GENERATED_ASSETS = bg_gameplay bg_title bg_gameover bg_win font player enemy
+
+.PHONY: all generate convert clean clean-generated clean-all run romusage
 
 all: prepare $(BINS)
 
@@ -107,18 +118,19 @@ prepare:
 
 run: $(BINS)
 ifeq ($(OS),Windows_NT)
-	# Use PowerShell Start-Process to reliably launch GUI apps from Make
 	powershell -NoProfile -Command Start-Process -FilePath "$(EMULICIOUS)" -ArgumentList "$(BINS)"
 else
 	$(EMULICIOUS) "$(BINS)" &
 endif
 
-# Remove only build artifacts; use `make clean-generated` to remove generated
-# asset sources in `res/` (background, font, sprite).
+romusage: $(BINS)
+	$(ROMUSAGE) $(BINS)
+
 clean:
 	rm -rf $(OBJDIR)
 
 clean-generated:
 	# Remove generated asset sources in res/ (backgrounds, fonts, sprites)
-	rm -f $(RESDIR)/bg_gameplay.* $(RESDIR)/bg_title.* $(RESDIR)/bg_gameover.* $(RESDIR)/bg_win.*
-	rm -f $(RESDIR)/font.* $(RESDIR)/player.* $(RESDIR)/enemy.*
+	rm -f $(addprefix $(RESDIR)/,$(addsuffix .*,$(GENERATED_ASSETS)))
+
+clean-all: clean clean-generated

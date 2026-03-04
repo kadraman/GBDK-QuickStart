@@ -1,3 +1,6 @@
+#pragma bank 255
+
+#include <gbdk/platform.h>
 #include <gb/gb.h>
 #include <gb/cgb.h>
 #include <stdint.h>
@@ -74,6 +77,7 @@ static void title_cleanup(void)
     /* Nothing to clean up */
 }
 
+BANKREF(state_title)
 const GameState state_title = {
     title_init,
     title_update,

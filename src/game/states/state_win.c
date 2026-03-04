@@ -1,3 +1,6 @@
+#pragma bank 255
+
+#include <gbdk/platform.h>
 #include <gb/gb.h>
 #include <gb/cgb.h>
 #include <stdint.h>
@@ -66,6 +69,7 @@ static void win_cleanup(void)
     /* Nothing to clean up */
 }
 
+BANKREF(state_win)
 const GameState state_win = {
     win_init,
     win_update,
