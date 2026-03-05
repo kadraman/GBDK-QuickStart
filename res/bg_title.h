@@ -2,6 +2,7 @@
 #ifndef BG_TITLE_H
 #define BG_TITLE_H
 
+#include <gbdk/platform.h>
 #include <gb/cgb.h>
 #include <stdint.h>
 
@@ -9,6 +10,11 @@
 #define BG_TITLE_PALETTE_COUNT 2U
 #define BG_TITLE_MAP_WIDTH     20U
 #define BG_TITLE_MAP_HEIGHT    18U
+
+BANKREF_EXTERN(bg_title_palettes)
+BANKREF_EXTERN(bg_title_tiles)
+BANKREF_EXTERN(bg_title_map)
+BANKREF_EXTERN(bg_title_attr_map)
 
 extern const palette_color_t bg_title_palettes[8];
 extern const uint8_t bg_title_tiles[160];

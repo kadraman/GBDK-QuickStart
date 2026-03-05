@@ -1,6 +1,7 @@
 #ifndef SPRITE_PLAYER_H
 #define SPRITE_PLAYER_H
 
+#include <gbdk/platform.h>
 #include <stdint.h>
 #include "sprite.h"
 
@@ -21,7 +22,8 @@
  * start_x   : starting world-X position
  * ground_y  : world-Y when standing on the ground (sprite top of ground frame)
  * tile_base : first VRAM tile slot used by player tile data */
-void player_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base);
+BANKREF_EXTERN(player_init)
+void player_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base) BANKED;
 
 /* Update player for one frame.
  * joy       : current joypad state
@@ -29,28 +31,36 @@ void player_init(uint8_t start_x, uint8_t ground_y, uint8_t tile_base);
  * camera_x  : pointer to current camera X scroll value; updated in place
  * min_world_x : leftward movement limit (ring-buffer safety, world pixels)
  * Returns   : bitmask of PLAYER_EVENT_* flags */
+BANKREF_EXTERN(player_update)
 uint8_t player_update(uint8_t joy, uint8_t joy_press, uint8_t *camera_x,
-                      uint16_t min_world_x);
+                      uint16_t min_world_x) BANKED;
 
 /* Free the player sprite and hide its OBJ slots. */
-void player_cleanup(void);
+BANKREF_EXTERN(player_cleanup)
+void player_cleanup(void) BANKED;
 
 /* Return a pointer to the player's Sprite struct (for collision checks). */
-Sprite* player_get_sprite(void);
+BANKREF_EXTERN(player_get_sprite)
+Sprite* player_get_sprite(void) BANKED;
 
 /* Return 1 if player is facing right, 0 if facing left. */
-uint8_t player_is_facing_right(void);
+BANKREF_EXTERN(player_is_facing_right)
+uint8_t player_is_facing_right(void) BANKED;
 
 /* Return 1 if the player is currently in the jump state. */
-uint8_t player_is_jumping(void);
+BANKREF_EXTERN(player_is_jumping)
+uint8_t player_is_jumping(void) BANKED;
 
 /* Return the player's full 16-bit world X position. */
-uint16_t player_get_world_x16(void);
+BANKREF_EXTERN(player_get_world_x16)
+uint16_t player_get_world_x16(void) BANKED;
 
 /* Trigger the player death animation. */
-void player_die(void);
+BANKREF_EXTERN(player_die)
+void player_die(void) BANKED;
 
 /* Return 1 if the player is currently in the death state. */
-uint8_t player_is_dying(void);
+BANKREF_EXTERN(player_is_dying)
+uint8_t player_is_dying(void) BANKED;
 
 #endif

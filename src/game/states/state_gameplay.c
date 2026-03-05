@@ -1,3 +1,6 @@
+#pragma bank 255
+
+#include <gbdk/platform.h>
 #include <gb/gb.h>
 #include <gb/cgb.h>
 #include <stdint.h>
@@ -357,6 +360,7 @@ static void gameplay_cleanup(void)
     SCX_REG = 0;
 }
 
+BANKREF(state_gameplay)
 const GameState state_gameplay = {
     gameplay_init,
     gameplay_update,

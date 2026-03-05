@@ -2,6 +2,7 @@
 #ifndef BG_GAMEPLAY_H
 #define BG_GAMEPLAY_H
 
+#include <gbdk/platform.h>
 #include <gb/cgb.h>
 #include <stdint.h>
 
@@ -9,6 +10,13 @@
 #define BG_GAMEPLAY_PALETTE_COUNT 2U
 #define BG_GAMEPLAY_MAP_WIDTH     48U
 #define BG_GAMEPLAY_MAP_HEIGHT    18U
+
+BANKREF_EXTERN(bg_gameplay_palettes)
+BANKREF_EXTERN(bg_gameplay_tiles)
+BANKREF_EXTERN(bg_gameplay_map)
+BANKREF_EXTERN(bg_gameplay_attr_map)
+BANKREF_EXTERN(bg_gameplay_collision_down_tiles)
+BANKREF_EXTERN(bg_gameplay_collision_tiles)
 
 extern const palette_color_t bg_gameplay_palettes[8];
 extern const uint8_t bg_gameplay_tiles[304];

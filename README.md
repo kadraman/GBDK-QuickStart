@@ -70,8 +70,8 @@ GBDK-QuickStart/
 │   ├── fonts/
 │   │   └── default/definition.py  → font.c/.h
 │   ├── sprites/
-│   │   ├── player/definition.py   → player.c/.h (16x16 animated)
-│   │   └── enemy/definition.py    → enemy.c/.h  (8x8 patrol enemy)
+│   │   ├── player/definition.py   → player.c/.h (16x16 animated, USE_AUTOBANK=False)
+│   │   └── enemy/definition.py    → enemy.c/.h  (8x8 patrol enemy, USE_AUTOBANK=False)
 │   ├── bg_gameplay.png / bg_gameplay.c/.h
 │   ├── bg_title.png / bg_title.c/.h
 │   ├── bg_gameover.png / bg_gameover.c/.h
@@ -148,14 +148,302 @@ make convert
 ### 5. Clean build artifacts
 
 ```bash
-make clean
-# Remove generated PNG/C/H asset files in `res/`:
-make clean-generated
+make clean         # Remove build artifacts (obj/)
+make clean-generated  # Remove generated PNG/C/H asset files in res/
+make clean-all     # Run both clean and clean-generated
 ```
+
+### 6. Check ROM bank usage
+
+```bash
+make romusage      # Show how ROM banks are utilized
+```
+
+See the **Autobanking** section below for details on ROM bank management.
 
 ### VS Code Tasks
 
 Press **Ctrl+Shift+B** (or **Cmd+Shift+B**) to run the default **Build GBC ROM** task. Additional tasks are available via **Terminal → Run Task…**
+
+---
+
+## Autobanking
+
+This project uses **GBDK-2020's autobanking** feature to automatically distribute code and data across multiple ROM banks. The Game Boy Color supports bank switching to access more than 32KB of ROM, and autobanking makes this transparent to the developer.
+
+### What is Autobanking?
+
+The Game Boy has a fixed 16KB ROM Bank 0 (always mapped at `0x0000-0x3FFF`) and a switchable 16KB window at `0x4000-0x7FFF` that can access any of the additional ROM banks (1-255 for MBC5). Autobanking lets the linker automatically:
+
+- Assign functions and data to appropriate banks
+- Generate bank-switching trampolines for cross-bank calls
+- Optimize bank usage to minimize wasted space
+
+### Compiler Flags
+
+The Makefile includes these autobanking-related flags:
+
+```makefile
+LCCFLAGS = -Wl-yt0x1B -Wm-yc -Wl-j -Wl-yoA -Wm-ya4 -autobank -Wb-ext=.rel -Wb-v
+```
+
+- `-autobank` — Enable automatic bank assignment
+- `-Wl-yoA` — Automatic bank area sizing (linker adjusts dynamically)
+- `-Wm-ya4` — Autobanking allocator heuristic (balance bank filling)
+- `-Wb-ext=.rel` — Use `.rel` extension for bank/relocation files
+- `-Wb-v` — Verbose banker output (shows bank assignments during build)
+
+### Autobanking Conventions
+
+Files that should be autobanked (placed in switchable ROM banks) must include this directive at the top:
+
+```c
+#pragma bank 255
+```
+
+**Bank 255 is a special marker** that tells the linker "this file should be autobanked." The linker will assign it to an actual bank (1, 2, 3, etc.) automatically—it does NOT place the file literally in bank 255.
+
+#### Required Header for Autobanked Files
+
+```c
+#pragma bank 255
+#include <gbdk/platform.h>
+#include <stdint.h>
+```
+
+The `<gbdk/platform.h>` header provides the `BANKREF()` and `BANKREF_EXTERN()` macros needed for proper bank reference tracking.
+
+#### Marking Exported Symbols
+
+For each exported function or const data array in an autobanked `.c` file, add `BANKREF()`:
+
+```c
+#pragma bank 255
+#include <gbdk/platform.h>
+
+BANKREF(level_data)
+const uint8_t level_data[] = { /* ... */ };
+
+BANKREF(update_level)
+void update_level(void) BANKED {
+    // ...
+}
+```
+
+In the matching `.h` file, use `BANKREF_EXTERN()` and mark functions with `BANKED`:
+
+```c
+#ifndef LEVEL_H
+#define LEVEL_H
+
+#include <gbdk/platform.h>
+
+BANKREF_EXTERN(level_data)
+extern const uint8_t level_data[];
+
+BANKREF_EXTERN(update_level)
+void update_level(void) BANKED;
+
+#endif
+```
+
+The `BANKED` attribute tells the compiler this function lives in a switchable bank and may require bank-switching logic when called.
+
+### What Should Be Autobanked?
+
+**Files that SHOULD be autobanked (`#pragma bank 255`):**
+- Game state implementations (`state_*.c`)
+- Game-specific sprite logic (`sprite_player.c`, `sprite_enemy.c`)
+- Large const data (backgrounds, sprites, fonts, sound data)
+  - Exception: Sprite tile/palette data accessed frequently from Bank 0 (e.g., `player.c`, `enemy.c` used in `main.c`) can be kept in Bank 0 by setting `USE_AUTOBANK = False` in the sprite definition (see Asset Generation section below)
+- Level data, map data, dialogue text
+
+**Files that MUST stay in Bank 0 (NO autobanking):**
+- `main.c` — Entry point and main loop
+- Interrupt service routines (ISRs)
+- Core engine utility code in `src/lib/src/` (unless specifically needed in banked code)
+
+### Adding New Game States
+
+When creating a new game state (e.g., `state_shop.c`):
+
+1. **Create the `.c` file with autobanking directives:**
+
+```c
+#pragma bank 255
+#include <gbdk/platform.h>
+#include <gb/gb.h>
+#include "states.h"
+
+static void shop_init(void) {
+    // Initialize shop screen
+}
+
+static void shop_update(void) {
+    // Handle shop logic
+}
+
+static void shop_cleanup(void) {
+    // Clean up shop resources
+}
+
+BANKREF(state_shop)
+const GameState state_shop = {
+    shop_init,
+    shop_update,
+    shop_cleanup
+};
+```
+
+2. **Create the matching `.h` file:**
+
+```c
+#ifndef STATE_SHOP_H
+#define STATE_SHOP_H
+
+#include <gbdk/platform.h>
+#include "states.h"
+
+BANKREF_EXTERN(state_shop)
+extern const GameState state_shop;
+
+#endif
+```
+
+3. **Register the state in `state_machine.c`** and rebuild.
+
+### Adding New Sprite Classes
+
+When creating a new sprite type (e.g., `sprite_boss.c`):
+
+1. **Create the `.c` file with autobanking:**
+
+```c
+#pragma bank 255
+#include <gbdk/platform.h>
+#include <gb/gb.h>
+#include "sprite.h"
+
+static Sprite boss_sprite;
+
+BANKREF(boss_init)
+void boss_init(void) BANKED {
+    // Initialize boss sprite
+}
+
+BANKREF(boss_update)
+void boss_update(void) BANKED {
+    // Update boss logic
+}
+
+BANKREF(boss_get_sprite)
+Sprite* boss_get_sprite(void) BANKED {
+    return &boss_sprite;
+}
+```
+
+2. **Create the matching `.h` file:**
+
+```c
+#pragma once
+#include <gbdk/platform.h>
+#include "sprite.h"
+
+BANKREF_EXTERN(boss_init)
+void boss_init(void) BANKED;
+
+BANKREF_EXTERN(boss_update)
+void boss_update(void) BANKED;
+
+BANKREF_EXTERN(boss_get_sprite)
+Sprite* boss_get_sprite(void) BANKED;
+```
+
+3. **Include and call from your game state** — BANKED functions can be called directly; the linker handles bank switching automatically.
+
+### Calling Banked Functions
+
+BANKED functions can typically be called directly:
+
+```c
+boss_init();
+boss_update();
+```
+
+The linker generates trampolines for cross-bank calls. For manual bank switching (advanced use):
+
+```c
+SWITCH_ROM(BANK(boss_update));
+boss_update();
+```
+
+### Asset Generation with Autobanking
+
+The asset generation tools (`tools/gbc_asset_builder.py`) automatically generate `.c` and `.h` files with autobanking conventions. By default, generated assets include:
+- `#pragma bank 255` at the top of `.c` files
+- `BANKREF()` macros for tile and palette data
+- `BANKREF_EXTERN()` in headers
+
+When you run `make generate`, backgrounds and fonts are always created with autobanking markup.
+
+#### Controlling Sprite Autobanking
+
+Sprite definitions support an optional `USE_AUTOBANK` parameter to control whether sprite data is autobanked:
+
+```python
+# res/sprites/player/definition.py
+NAME = 'player'
+SIZE = '16x16'
+
+# Keep in Bank 0 (accessed directly from main.c)
+USE_AUTOBANK = False
+
+PALETTE = [...]
+# ... rest of definition
+```
+
+**When to use `USE_AUTOBANK = False`:**
+- Small sprite data accessed directly from Bank 0 code (like `main.c`)
+- Sprites loaded once during initialization
+- When you don't want to use `SWITCH_ROM()` for data access
+
+**When to use `USE_AUTOBANK = True` (default):**
+- Large sprite data that would consume too much Bank 0 space
+- Sprites only accessed from autobanked game states
+- When Bank 0 space is limited
+
+**Important:** GBDK-2020 generates bank-switching trampolines only for `BANKED` function calls—it does NOT automatically switch banks when Bank 0 code reads const data from autobanked arrays. If you access autobanked sprite data from Bank 0, you must manually use `SWITCH_ROM(BANK(sprite_tiles))` before each access, or set `USE_AUTOBANK = False` in the sprite definition.
+
+In this template, `player` and `enemy` sprites use `USE_AUTOBANK = False` because their tile and palette data is loaded directly from `main.c` (Bank 0) during initialization.
+
+### Checking ROM Usage
+
+After building, check bank utilization:
+
+```bash
+make romusage
+```
+
+This shows how much space is used in each ROM bank. Example output:
+
+```
+Bank         Range                Size     Used  Used%     Free  Free%
+--------     ----------------  -------  -------  -----  -------  -----
+ROM_0        0x0000 -> 0x3FFF    16384     3184    19%    13200    81%
+ROM_1        0x4000 -> 0x7FFF    16384    11549    70%     4835    30%
+```
+
+As your game grows, the linker will automatically allocate additional banks (ROM_2, ROM_3, etc.) as needed.
+
+### Summary
+
+- **Always use** `#pragma bank 255` for game states, sprites, and large data
+- **Always mark** exported symbols with `BANKREF()` in `.c` and `BANKREF_EXTERN()` in `.h`
+- **Always mark** banked functions with the `BANKED` attribute in headers
+- **Keep** `main.c` and ISRs in Bank 0 (no `#pragma bank 255`)
+- **Run** `make romusage` to monitor bank usage
+
+See [`.github/copilot-instructions.md`](.github/copilot-instructions.md) for the complete autobanking workflow rules.
 
 ---
 
@@ -220,7 +508,7 @@ typedef struct {
 
 To add a new state:
 1. Add a new entry to `GameStateID` in `states.h`
-2. Create `state_newstate.c/.h` implementing `init`, `update`, `cleanup`
+2. Create `state_newstate.c/.h` implementing `init`, `update`, `cleanup` (with autobanking directives—see **Autobanking** section)
 3. Add `&state_newstate` to the `states[]` array in `state_machine.c`
 
 ---
@@ -238,9 +526,10 @@ generating all PNG and C/H source files from scratch.  No GBDK installation is n
 | `tiles_to_2bpp_bytes(tiles)` | Flatten a list of tiles to a byte list |
 | `png_to_tiles(png_path)` | Load indexed PNG and extract 8×8 tile pixel data |
 | `make_indexed_png(grid, palette, path)` | Create indexed PNG from pixel array |
-| `write_background_files(...)` | Write background `.c` + `.h` from tile/map/palette data |
-| `write_font_files(...)` | Write font `.c` + `.h` from tile/palette data |
-| `write_sprite_files(...)` | Write sprite `.c` + `.h` for 8×16 sprite mode |
+| `write_background_files(...)` | Write background `.c` + `.h` from tile/map/palette data (always autobanked) |
+| `write_font_files(...)` | Write font `.c` + `.h` from tile/palette data (always autobanked) |
+| `write_sprite_files(...)` | Write sprite `.c` + `.h` for 8×16 sprite mode (supports `use_autobank` parameter) |
+| `write_sprite_files_animated(...)` | Write sprite `.c` + `.h` with multiple animations (supports `use_autobank` parameter) |
 
 ### Creating your own example
 
@@ -253,6 +542,8 @@ generating all PNG and C/H source files from scratch.  No GBDK installation is n
 
 3. **New sprite** – copy `tools/gen_sprite.py`, edit `FRAMES_TOP` / `FRAMES_BOTTOM`
    (8×8 pixel arrays using the colour aliases `T Y B D`), adjust `PALETTE_COLORS`.
+   Set `USE_AUTOBANK = False` in the sprite definition if the data will be
+   accessed directly from Bank 0 code (like `main.c`).
 
 4. Import `gbc_asset_builder` in your own script to reuse the 2bpp conversion and
    file-writing helpers for any custom asset type.
@@ -292,6 +583,10 @@ Alternatively, if you have GBDK-2020 and prefer `png2asset`:
        game sprite create or edit `res/sprites/<name>/definition.py` and adjust
        the frames and metadata (start indices, frames-per-animation, tile
        counts, palette indices) to match your artwork.
+    - **Important:** If your sprite data will be accessed directly from Bank 0
+       code (like `main.c`), add `USE_AUTOBANK = False` to the definition to
+       keep the data in Bank 0. Otherwise, the default `USE_AUTOBANK = True`
+       places the data in a switchable bank.
     - Run the asset generator to produce the `res/<name>.c` and `res/<name>.h`
        files. The simplest way is to run the master generator which picks up
        all definitions:

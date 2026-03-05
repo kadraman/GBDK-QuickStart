@@ -2,6 +2,7 @@
 #ifndef ENEMY_H
 #define ENEMY_H
 
+#include <gbdk/platform.h>
 #include <gb/cgb.h>
 #include <stdint.h>
 

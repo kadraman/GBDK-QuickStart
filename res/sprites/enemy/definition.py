@@ -17,6 +17,9 @@ Animation list
 NAME = 'enemy'
 SIZE = '8x8'
 
+# Keep enemy sprite data in Bank 0 (accessed directly from main.c)
+USE_AUTOBANK = False
+
 # GBC sprite palette: index 0 = transparent on OBJ layer
 PALETTE = [
     (255,   0, 255),   # 0 – transparent (magenta key)

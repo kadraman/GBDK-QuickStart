@@ -1,3 +1,6 @@
+#pragma bank 255
+
+#include <gbdk/platform.h>
 #include <gb/gb.h>
 #include <gb/cgb.h>
 #include <stdint.h>
@@ -67,6 +70,7 @@ static void gameover_cleanup(void)
     /* Nothing to clean up */
 }
 
+BANKREF(state_gameover)
 const GameState state_gameover = {
     gameover_init,
     gameover_update,
