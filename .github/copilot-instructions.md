@@ -93,7 +93,7 @@ level_X.h  → header with BANKREF_EXTERN declarations
 The build system must include:
 - `-autobank`
 - `-Wl-yoA` (automatic bank sizing)
-- correct MBC type, e.g. `-Wl-yt1B`
+- correct MBC type, e.g. `-Wl-yt0x1B`
 
 ---
 
@@ -118,7 +118,9 @@ void func_name(void) BANKED {
 ## 8. Template for autobanked .h files
 
 ```c
-#pragma once
+#ifndef MODULE_NAME_H
+#define MODULE_NAME_H
+
 #include <gbdk/platform.h>
 
 BANKREF_EXTERN(identifier)
@@ -126,7 +128,8 @@ BANKREF_EXTERN(func_name)
 
 extern const uint8_t identifier[];
 void func_name(void) BANKED;
-```
+
+#endif
 
 ---
 
@@ -253,7 +256,7 @@ Game states implement the `GameState` interface (`init`, `update`, `cleanup` cal
    }
    
    BANKREF(state_shop)
-   GameState state_shop = {
+   const GameState state_shop = {
        shop_init,
        shop_update,
        shop_cleanup
@@ -262,13 +265,16 @@ Game states implement the `GameState` interface (`init`, `update`, `cleanup` cal
 
 4. **Create header** in `src/game/states/state_shop.h`:
    ```c
-   #pragma once
+   #ifndef STATE_SHOP_H
+   #define STATE_SHOP_H
+   
    #include <gbdk/platform.h>
    #include "states.h"
    
    BANKREF_EXTERN(state_shop)
-   extern GameState state_shop;
-   ```
+   extern const GameState state_shop;
+   
+   #endif
 
 5. **Register in state machine**:
    - Add `STATE_SHOP` to `GameStateID` enum in `src/lib/include/states.h`
@@ -347,7 +353,9 @@ Sprite classes encapsulate sprite logic (init, update, collision, animation).
 
 4. **Create header** in `src/game/sprites/sprite_boss.h`:
    ```c
-   #pragma once
+   #ifndef SPRITE_BOSS_H
+   #define SPRITE_BOSS_H
+   
    #include <gbdk/platform.h>
    #include "sprite.h"
    
@@ -362,7 +370,8 @@ Sprite classes encapsulate sprite logic (init, update, collision, animation).
    
    BANKREF_EXTERN(boss_get_sprite)
    Sprite* boss_get_sprite(void) BANKED;
-   ```
+   
+   #endif
 
 5. **Load sprite tiles** in your game state's `init()`:
    ```c

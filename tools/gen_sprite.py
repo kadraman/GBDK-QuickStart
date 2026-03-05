@@ -75,6 +75,7 @@ def process_definition(defn_path):
     pixel_chars['.'] = 0   # '.' is always transparent
     size        = getattr(mod, 'SIZE', '8x16')
     anim_speeds = getattr(mod, 'ANIM_SPEEDS', None)
+    use_autobank = getattr(mod, 'USE_AUTOBANK', True)  # Default to True for autobanking
 
     animations = mod.ANIMATIONS
 
@@ -116,6 +117,7 @@ def process_definition(defn_path):
         out_dir=out_dir,
         size=size,
         anim_speeds=anim_speeds,
+        use_autobank=use_autobank,
     )
 
 

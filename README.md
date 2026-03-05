@@ -70,8 +70,8 @@ GBDK-QuickStart/
 │   ├── fonts/
 │   │   └── default/definition.py  → font.c/.h
 │   ├── sprites/
-│   │   ├── player/definition.py   → player.c/.h (16x16 animated)
-│   │   └── enemy/definition.py    → enemy.c/.h  (8x8 patrol enemy)
+│   │   ├── player/definition.py   → player.c/.h (16x16 animated, USE_AUTOBANK=False)
+│   │   └── enemy/definition.py    → enemy.c/.h  (8x8 patrol enemy, USE_AUTOBANK=False)
 │   ├── bg_gameplay.png / bg_gameplay.c/.h
 │   ├── bg_title.png / bg_title.c/.h
 │   ├── bg_gameover.png / bg_gameover.c/.h
@@ -233,7 +233,9 @@ void update_level(void) BANKED {
 In the matching `.h` file, use `BANKREF_EXTERN()` and mark functions with `BANKED`:
 
 ```c
-#pragma once
+#ifndef LEVEL_H
+#define LEVEL_H
+
 #include <gbdk/platform.h>
 
 BANKREF_EXTERN(level_data)
@@ -241,6 +243,8 @@ extern const uint8_t level_data[];
 
 BANKREF_EXTERN(update_level)
 void update_level(void) BANKED;
+
+#endif
 ```
 
 The `BANKED` attribute tells the compiler this function lives in a switchable bank and may require bank-switching logic when called.
@@ -251,6 +255,7 @@ The `BANKED` attribute tells the compiler this function lives in a switchable ba
 - Game state implementations (`state_*.c`)
 - Game-specific sprite logic (`sprite_player.c`, `sprite_enemy.c`)
 - Large const data (backgrounds, sprites, fonts, sound data)
+  - Exception: Sprite tile/palette data accessed frequently from Bank 0 (e.g., `player.c`, `enemy.c` used in `main.c`) can be kept in Bank 0 by setting `USE_AUTOBANK = False` in the sprite definition (see Asset Generation section below)
 - Level data, map data, dialogue text
 
 **Files that MUST stay in Bank 0 (NO autobanking):**
@@ -283,7 +288,7 @@ static void shop_cleanup(void) {
 }
 
 BANKREF(state_shop)
-GameState state_shop = {
+const GameState state_shop = {
     shop_init,
     shop_update,
     shop_cleanup
@@ -293,12 +298,16 @@ GameState state_shop = {
 2. **Create the matching `.h` file:**
 
 ```c
-#pragma once
+#ifndef STATE_SHOP_H
+#define STATE_SHOP_H
+
 #include <gbdk/platform.h>
 #include "states.h"
 
 BANKREF_EXTERN(state_shop)
-extern GameState state_shop;
+extern const GameState state_shop;
+
+#endif
 ```
 
 3. **Register the state in `state_machine.c`** and rebuild.
@@ -370,12 +379,42 @@ boss_update();
 
 ### Asset Generation with Autobanking
 
-The asset generation tools (`tools/gbc_asset_builder.py`) automatically generate `.c` and `.h` files with autobanking conventions. Generated assets include:
+The asset generation tools (`tools/gbc_asset_builder.py`) automatically generate `.c` and `.h` files with autobanking conventions. By default, generated assets include:
 - `#pragma bank 255` at the top of `.c` files
 - `BANKREF()` macros for tile and palette data
 - `BANKREF_EXTERN()` in headers
 
-When you run `make generate`, all backgrounds, fonts, and sprites are created with proper autobanking markup.
+When you run `make generate`, backgrounds and fonts are always created with autobanking markup.
+
+#### Controlling Sprite Autobanking
+
+Sprite definitions support an optional `USE_AUTOBANK` parameter to control whether sprite data is autobanked:
+
+```python
+# res/sprites/player/definition.py
+NAME = 'player'
+SIZE = '16x16'
+
+# Keep in Bank 0 (accessed directly from main.c)
+USE_AUTOBANK = False
+
+PALETTE = [...]
+# ... rest of definition
+```
+
+**When to use `USE_AUTOBANK = False`:**
+- Small sprite data accessed directly from Bank 0 code (like `main.c`)
+- Sprites loaded once during initialization
+- When you don't want to use `SWITCH_ROM()` for data access
+
+**When to use `USE_AUTOBANK = True` (default):**
+- Large sprite data that would consume too much Bank 0 space
+- Sprites only accessed from autobanked game states
+- When Bank 0 space is limited
+
+**Important:** GBDK-2020 generates bank-switching trampolines only for `BANKED` function calls—it does NOT automatically switch banks when Bank 0 code reads const data from autobanked arrays. If you access autobanked sprite data from Bank 0, you must manually use `SWITCH_ROM(BANK(sprite_tiles))` before each access, or set `USE_AUTOBANK = False` in the sprite definition.
+
+In this template, `player` and `enemy` sprites use `USE_AUTOBANK = False` because their tile and palette data is loaded directly from `main.c` (Bank 0) during initialization.
 
 ### Checking ROM Usage
 
@@ -487,9 +526,10 @@ generating all PNG and C/H source files from scratch.  No GBDK installation is n
 | `tiles_to_2bpp_bytes(tiles)` | Flatten a list of tiles to a byte list |
 | `png_to_tiles(png_path)` | Load indexed PNG and extract 8×8 tile pixel data |
 | `make_indexed_png(grid, palette, path)` | Create indexed PNG from pixel array |
-| `write_background_files(...)` | Write background `.c` + `.h` from tile/map/palette data |
-| `write_font_files(...)` | Write font `.c` + `.h` from tile/palette data |
-| `write_sprite_files(...)` | Write sprite `.c` + `.h` for 8×16 sprite mode |
+| `write_background_files(...)` | Write background `.c` + `.h` from tile/map/palette data (always autobanked) |
+| `write_font_files(...)` | Write font `.c` + `.h` from tile/palette data (always autobanked) |
+| `write_sprite_files(...)` | Write sprite `.c` + `.h` for 8×16 sprite mode (supports `use_autobank` parameter) |
+| `write_sprite_files_animated(...)` | Write sprite `.c` + `.h` with multiple animations (supports `use_autobank` parameter) |
 
 ### Creating your own example
 
@@ -502,6 +542,8 @@ generating all PNG and C/H source files from scratch.  No GBDK installation is n
 
 3. **New sprite** – copy `tools/gen_sprite.py`, edit `FRAMES_TOP` / `FRAMES_BOTTOM`
    (8×8 pixel arrays using the colour aliases `T Y B D`), adjust `PALETTE_COLORS`.
+   Set `USE_AUTOBANK = False` in the sprite definition if the data will be
+   accessed directly from Bank 0 code (like `main.c`).
 
 4. Import `gbc_asset_builder` in your own script to reuse the 2bpp conversion and
    file-writing helpers for any custom asset type.
@@ -541,6 +583,10 @@ Alternatively, if you have GBDK-2020 and prefer `png2asset`:
        game sprite create or edit `res/sprites/<name>/definition.py` and adjust
        the frames and metadata (start indices, frames-per-animation, tile
        counts, palette indices) to match your artwork.
+    - **Important:** If your sprite data will be accessed directly from Bank 0
+       code (like `main.c`), add `USE_AUTOBANK = False` to the definition to
+       keep the data in Bank 0. Otherwise, the default `USE_AUTOBANK = True`
+       places the data in a switchable bank.
     - Run the asset generator to produce the `res/<name>.c` and `res/<name>.h`
        files. The simplest way is to run the master generator which picks up
        all definitions:

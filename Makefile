@@ -34,7 +34,7 @@ endif
 
 LCC         = $(GBDK_HOME)/bin/lcc
 PNG2ASSET   = $(GBDK_HOME)/bin/png2asset
-ROMUSAGE   	= $(GBDK_HOME)/bin/romusage
+ROMUSAGE    = $(GBDK_HOME)/bin/romusage
 
 PROJECTNAME = quickstart
 SRCDIR      = src
@@ -50,7 +50,7 @@ RESDIR      = res
 # -autobank       Enable automatic bank assignment by linker
 # -Wb-ext=.rel    Use .rel extension for bank/relocation files
 # -Wb-v           Verbose banker output (show bank assignments)
-LCCFLAGS 	= -Wl-yt0x1B -Wm-yc -Wl-j -Wl-yoA -Wm-ya4 -autobank -Wb-ext=.rel -Wb-v
+LCCFLAGS    = -Wl-yt0x1B -Wm-yc -Wl-j -Wl-yoA -Wm-ya4 -autobank -Wb-ext=.rel -Wb-v
 
 BINS        = $(OBJDIR)/$(PROJECTNAME).gbc
 

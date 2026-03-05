@@ -14,17 +14,17 @@
 BANKREF_EXTERN(bg_gameplay_palettes)
 BANKREF_EXTERN(bg_gameplay_tiles)
 BANKREF_EXTERN(bg_gameplay_map)
+BANKREF_EXTERN(bg_gameplay_attr_map)
+BANKREF_EXTERN(bg_gameplay_collision_down_tiles)
+BANKREF_EXTERN(bg_gameplay_collision_tiles)
 
 extern const palette_color_t bg_gameplay_palettes[8];
 extern const uint8_t bg_gameplay_tiles[304];
 extern const uint8_t bg_gameplay_map[864];
-BANKREF_EXTERN(bg_gameplay_attr_map)
 extern const uint8_t bg_gameplay_attr_map[864];
 #define BG_GAMEPLAY_COLLISION_DOWN_TILE_COUNT 6U
-BANKREF_EXTERN(bg_gameplay_collision_down_tiles)
 extern const uint8_t bg_gameplay_collision_down_tiles[6];
 #define BG_GAMEPLAY_COLLISION_TILE_COUNT 5U
-BANKREF_EXTERN(bg_gameplay_collision_tiles)
 extern const uint8_t bg_gameplay_collision_tiles[5];
 
 #endif

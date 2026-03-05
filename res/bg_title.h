@@ -14,11 +14,11 @@
 BANKREF_EXTERN(bg_title_palettes)
 BANKREF_EXTERN(bg_title_tiles)
 BANKREF_EXTERN(bg_title_map)
+BANKREF_EXTERN(bg_title_attr_map)
 
 extern const palette_color_t bg_title_palettes[8];
 extern const uint8_t bg_title_tiles[160];
 extern const uint8_t bg_title_map[360];
-BANKREF_EXTERN(bg_title_attr_map)
 extern const uint8_t bg_title_attr_map[360];
 
 #endif

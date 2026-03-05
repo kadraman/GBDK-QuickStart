@@ -14,11 +14,11 @@
 BANKREF_EXTERN(bg_gameover_palettes)
 BANKREF_EXTERN(bg_gameover_tiles)
 BANKREF_EXTERN(bg_gameover_map)
+BANKREF_EXTERN(bg_gameover_attr_map)
 
 extern const palette_color_t bg_gameover_palettes[8];
 extern const uint8_t bg_gameover_tiles[128];
 extern const uint8_t bg_gameover_map[360];
-BANKREF_EXTERN(bg_gameover_attr_map)
 extern const uint8_t bg_gameover_attr_map[360];
 
 #endif
